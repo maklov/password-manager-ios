@@ -9,12 +9,14 @@ import SwiftUI
 
 @main
 struct password_manager_iosApp: App {
-    let persistenceController = PersistenceController.shared
-
+    @StateObject private var vaultManager = LocalVaultManager()
+    @StateObject private var navState = AppNavigationState()
+    
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environment(\.managedObjectContext, persistenceController.container.viewContext)
+            AppRootView()
+                .environmentObject(vaultManager)
+                .environmentObject(navState)
         }
     }
 }

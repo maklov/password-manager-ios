@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SecuritySettingsView: View {
+    @EnvironmentObject var navState: AppNavigationState
     @State private var biometricUnlock = true
     @State private var selfDestruct = false
     
@@ -45,9 +46,28 @@ struct SecuritySettingsView: View {
                 .cornerRadius(20)
             }
             .padding(24)
+            Button(action: {
+                    // TUTAJ W PRZYSZŁOŚCI: authManager.clearMasterKey() - ZABIJEMY KLUCZ W RAM
+                    navState.currentRoute = .welcome // Powrót na ekran główny!
+                }) {
+                    HStack {
+                        Image(systemName: "lock.fill")
+                        Text("Lock Vault & Disconnect")
+                    }
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.red.opacity(0.8))
+                    .cornerRadius(16)
+                }
+                .padding(.top, 20)
+                .padding(.bottom, 100) // Żeby nie wchodziło pod TabBar
+            }
+            .padding(24)
         }
-    }
-}
+        }
+
 
 // Pomocnicze komponenty do wierszy
 struct SecurityToggle: View {

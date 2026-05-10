@@ -9,27 +9,29 @@ struct VaultListView: View {
     @State private var searchText = ""
 
     @State private var selectedCategory = "All"
+    @State private var showingAddEntry = false
 
      
 
     let categories = ["All", "Finance", "Social", "Work", "Notes"]
 
-     
-
-    // Przykładowe dane do testów UI
-
-    let mockData = [
-
-        VaultEntry(title: "Google", subtitle: "alex.designer@gmail.com", ciphertext: "...", iv: "...", category: "Work", lastModified: "2 DAYS AGO", iconName: "envelope.fill"),
-
-        VaultEntry(title: "Facebook", subtitle: "social_master_99", ciphertext: "...", iv: "...", category: "Social", lastModified: "1 WEEK AGO", iconName: "network"),
-
-        VaultEntry(title: "Amazon", subtitle: "shopping_prime_user", ciphertext: "...", iv: "...", category: "Finance", lastModified: "JUST NOW", iconName: "cart.fill"),
-
-        VaultEntry(title: "Netflix", subtitle: "family_streamer", ciphertext: "...", iv: "...", category: "Social", lastModified: "1 MONTH AGO", iconName: "play.tv.fill")
-
-    ]
-
+    var filteredEntries: [VaultEntry] {
+        var result = vaultManager.entries
+        
+        // Filtrowanie po kategorii
+        if selectedCategory != "All" {
+            result = result.filter { $0.category == selectedCategory }
+        }
+        
+        // Filtrowanie po tekście
+        if !searchText.isEmpty {
+            result = result.filter {
+                $0.title.localizedCaseInsensitiveContains(searchText) ||
+                $0.username.localizedCaseInsensitiveContains(searchText)
+            }
+        }
+        return result
+    }
      
 
     var body: some View {
@@ -45,165 +47,161 @@ struct VaultListView: View {
              
 
             VStack(spacing: 0) {
-
+                
                 // --- NAGŁÓWEK ---
-
+                
                 HStack {
-
+                    
                     HStack {
-
+                        
                         RoundedRectangle(cornerRadius: 8)
-
+                        
                             .fill(Color(red: 1.0, green: 0.85, blue: 0.76))
-
+                        
                             .frame(width: 32, height: 32)
-
+                        
                             .overlay(Image(systemName: "lock.fill").foregroundColor(.black).font(.system(size: 14)))
-
-                         
-
+                        
+                        
+                        
                         Text("The Vault")
-
+                        
                             .font(.system(size: 20, weight: .bold))
-
+                        
                             .foregroundColor(Color(red: 0.51, green: 0.51, blue: 1))
-
+                        
                     }
-
+                    
                     Spacer()
-
+                    
                     Image(systemName: "magnifyingglass")
-
+                    
                         .foregroundColor(Color(red: 0.51, green: 0.51, blue: 1))
-
+                    
                         .font(.system(size: 20))
-
+                    
                 }
-
+                
                 .padding(.horizontal, 24)
-
+                
                 .padding(.top, 16)
-
-                 
-
+                
+                
+                
                 // --- TYTUŁ ---
-
+                
                 VStack(alignment: .leading, spacing: 4) {
-
+                    
                     Text("SECURE REPOSITORY")
-
+                    
                         .font(.system(size: 11, weight: .bold))
-
+                    
                         .tracking(1.5)
-
+                    
                         .foregroundColor(Color(red: 0.76, green: 0.78, blue: 0.84).opacity(0.6))
-
-                     
-
+                    
+                    
+                    
                     Text("Vault")
-
+                    
                         .font(.system(size: 40, weight: .heavy))
-
+                    
                         .foregroundColor(.white)
-
+                    
                 }
-
+                
                 .frame(maxWidth: .infinity, alignment: .leading)
-
+                
                 .padding(.horizontal, 24)
-
+                
                 .padding(.top, 24)
-
-                 
-
+                
+                
+                
                 // --- WYSZUKIWARKA ---
-
+                
                 HStack {
-
+                    
                     Image(systemName: "magnifyingglass")
-
+                    
                         .foregroundColor(Color.gray)
-
+                    
                     TextField("Search passwords, keys, and notes", text: $searchText)
-
+                    
                         .foregroundColor(.white)
-
+                    
                 }
-
+                
                 .padding()
-
+                
                 .background(Color(red: 0.12, green: 0.12, blue: 0.13))
-
+                
                 .cornerRadius(12)
-
+                
                 .padding(.horizontal, 24)
-
+                
                 .padding(.top, 16)
-
-                 
-
+                
+                
+                
                 // --- KATEGORIE ---
-
+                
                 ScrollView(.horizontal, showsIndicators: false) {
-
+                    
                     HStack(spacing: 12) {
-
+                        
                         ForEach(categories, id: \.self) { category in
-
+                            
                             Text(category)
-
+                            
                                 .font(.system(size: 14, weight: .semibold))
-
+                            
                                 .padding(.horizontal, 20)
-
+                            
                                 .padding(.vertical, 10)
-
+                            
                                 .background(selectedCategory == category ? Color(red: 0.51, green: 0.51, blue: 1) : Color(red: 0.16, green: 0.16, blue: 0.17))
-
+                            
                                 .foregroundColor(selectedCategory == category ? .white : Color(red: 0.76, green: 0.78, blue: 0.84))
-
+                            
                                 .cornerRadius(20)
-
+                            
                                 .onTapGesture {
-
+                                    
                                     selectedCategory = category
-
+                                    
                                 }
-
+                            
                         }
-
+                        
                     }
-
+                    
                     .padding(.horizontal, 24)
-
+                    
                 }
-
+                
                 .padding(.top, 20)
-
-                 
-
+                
+                
+                
                 // --- LISTA HASEŁ ---
-
+                
                 ScrollView {
-
                     VStack(spacing: 16) {
-
-                        ForEach(mockData) { entry in
-
-                            VaultItemRow(entry: entry)
-
+                        // Używamy filteredEntries zamiast vaultManager.entries
+                        ForEach(filteredEntries) { entry in
+                            NavigationLink(destination: PasswordDetailView(entry: entry, onDelete: {
+                                vaultManager.entries.removeAll(where: { $0.id == entry.id })
+                                    vaultManager.saveToOfflineCache()
+                            })) {
+                                VaultItemRow(entry: entry)
+                            }
+                            .buttonStyle(PlainButtonStyle())
                         }
-
                     }
-
                     .padding(.horizontal, 24)
-
-                    .padding(.top, 24)
-
-                    .padding(.bottom, 100) // Miejsce na Tab Bar
-
+                    .padding(.bottom, 100)
                 }
-
             }
 
              
@@ -221,6 +219,7 @@ struct VaultListView: View {
                     Button(action: {
 
                         // Akcja dodawania hasła
+                        showingAddEntry = true
 
                     }) {
 
@@ -257,6 +256,11 @@ struct VaultListView: View {
                 Spacer()
 
                 CustomTabBar()
+                    .sheet(isPresented: $showingAddEntry) {
+                        
+                        AddVaultEntryView()
+                            .environmentObject(vaultManager)
+                    }
 
             }
 
@@ -310,7 +314,7 @@ struct VaultItemRow: View {
 
                     .foregroundColor(.white)
 
-                Text(entry.subtitle)
+                Text(entry.username)
 
                     .font(.system(size: 12, weight: .regular))
 

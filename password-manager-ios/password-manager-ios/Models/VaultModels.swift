@@ -12,11 +12,13 @@ import Foundation
 
 struct VaultEntry: Identifiable, Codable {
 
-    var id: UUID = UUID()
+    let id: UUID
 
     let title: String          // np. "Google"
 
-    let subtitle: String       // np. "alex.designer@gmail.com"
+    let username: String       // np. "alex.designer@gmail.com"
+    
+    let website: String
 
     let ciphertext: String     // Nasze zaszyfrowane hasło
 
@@ -27,6 +29,19 @@ struct VaultEntry: Identifiable, Codable {
     let lastModified: String   // np. "2 DAYS AGO"
 
     let iconName: String       // Nazwa ikony z SF Symbols
+    
+    init(id: UUID = UUID(), title: String, username: String, website: String, ciphertext: String, iv: String, category: String, lastModified: String, iconName: String) {
+        self.id = id
+        self.title = title
+        self.username = username
+        self.website = website
+        self.ciphertext = ciphertext
+        self.iv = iv
+        self.category = category
+        self.lastModified = lastModified
+        self.iconName = iconName
+        
+    }
 
 }
 

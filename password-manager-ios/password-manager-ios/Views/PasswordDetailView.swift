@@ -1,17 +1,33 @@
 import SwiftUI
 
 struct PasswordDetailView: View {
-    @State var entry: VaultEntry // Używamy @State, aby móc edytować obiekt
+    @State var entry: VaultEntry
     @Environment(\.dismiss) var dismiss
     
-    var onDelete: () -> Void
+    @EnvironmentObject var authManager: AuthManager
+    @EnvironmentObject var vaultManager: LocalVaultManager
     
-    // Stany dla edycji i generatora
-    @State private var isPasswordVisible: Bool = false
-    @State private var showGenerator: Bool = true // Zgodnie z designem panel jest otwarty
+    @State private var isEditing: Bool = false
+    @State private var editableUsername: String = ""
+    @State private var editableWebsite: String = ""
+    @State private var editablePassword: String = ""
+    @State private var editableCategory: String = "General" // NOWE POLE DLA KATEGORII
+    
+    let categories = ["Finance", "Social", "Work", "Notes", "General"]
+    
+    @State private var showGenerator: Bool = true
     @State private var passwordLength: Double = 24
     @State private var useSymbols: Bool = true
     @State private var useNumbers: Bool = true
+    
+    @State private var showingGeneratorAlert: Bool = false
+    @State private var generatedPasswordPlaceholder: String = ""
+    
+    private var decryptedVaultPassword: String {
+        return vaultManager.decryptEntry(entry: entry, masterKey: authManager.currentMasterKey) ?? "Error decrypting"
+    }
+    
+    var onDelete: () -> Void
     
     var body: some View {
         ZStack {
@@ -20,7 +36,7 @@ struct PasswordDetailView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 24) {
                     
-                    // --- NAGŁÓWEK ---
+                    // --- HEADER ---
                     VStack(spacing: 12) {
                         ZStack {
                             RoundedRectangle(cornerRadius: 16)
@@ -51,16 +67,16 @@ struct PasswordDetailView: View {
                             .foregroundColor(.white)
                         
                         HStack(alignment: .bottom) {
-                            Text("Your password is exceptionally\nstrong.")
+                            let currentLength = isEditing ? editablePassword.count : decryptedVaultPassword.count
+                            Text(currentLength >= 16 ? "Your password is exceptionally\nstrong." : "Consider generating a stronger\npassword.")
                                 .font(.system(size: 12))
                                 .foregroundColor(.gray)
                             Spacer()
-                            Text("98%")
+                            Text("\(min(100, max(25, currentLength * 4)))%")
                                 .font(.system(size: 24, weight: .bold))
                                 .foregroundColor(.white)
                         }
                         
-                        // Pasek postępu (Gradient)
                         Capsule()
                             .fill(LinearGradient(colors: [Color(red: 1.0, green: 0.85, blue: 0.76), Color(red: 0.51, green: 0.51, blue: 1)], startPoint: .leading, endPoint: .trailing))
                             .frame(height: 4)
@@ -69,16 +85,43 @@ struct PasswordDetailView: View {
                     .background(Color(red: 0.12, green: 0.12, blue: 0.13))
                     .cornerRadius(16)
                     
-                    // --- POLA DANYCH ---
+                    // --- DATA FIELDS & CATEGORY PICKER ---
                     VStack(spacing: 16) {
-                        DetailRow(label: "USERNAME", value: entry.username, isCopyable: true)
-                        DetailRow(label: "PASSWORD", value: "••••••••••••••••••••••••", isCopyable: true, isSecure: true)
-                        DetailRow(label: "WEBSITE", value: "github.com", isCopyable: false, actionIcon: "arrow.up.right.square")
+                        DetailRow(label: "USERNAME", value: $editableUsername, isEditing: isEditing, isCopyable: true)
+                        DetailRow(label: "PASSWORD", value: $editablePassword, isEditing: isEditing, isCopyable: true, isSecure: true)
+                        DetailRow(label: "WEBSITE", value: $editableWebsite, isEditing: isEditing, isCopyable: false, actionIcon: "arrow.up.right.square")
+                        
+                        // NOWA SEKCJA WYBORU KATEGORII W DETALACH
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("CATEGORY")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(.gray)
+                            
+                            HStack {
+                                if isEditing {
+                                    Picker("Select Category", selection: $editableCategory) {
+                                        ForEach(categories, id: \.self) { cat in
+                                            Text(cat).tag(cat)
+                                        }
+                                    }
+                                    .pickerStyle(.menu)
+                                    .tint(Color(red: 0.51, green: 0.51, blue: 1))
+                                } else {
+                                    Text(editableCategory.uppercased())
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundColor(.white)
+                                }
+                                Spacer()
+                            }
+                            .padding()
+                            .frame(maxWidth: .infinity)
+                            .background(Color(red: 0.16, green: 0.16, blue: 0.17))
+                            .cornerRadius(12)
+                        }
                     }
                     
-                    // --- GENERATOR HASEŁ (EDYCJA) ---
+                    // --- PASSWORD GENERATOR ---
                     VStack(spacing: 0) {
-                        // Przycisk rozwijający
                         Button(action: {
                             withAnimation { showGenerator.toggle() }
                         }) {
@@ -104,7 +147,6 @@ struct PasswordDetailView: View {
                                 }
                                 .foregroundColor(.white)
                                 
-                                // Suwak długości
                                 VStack(spacing: 12) {
                                     HStack {
                                         Text("Length")
@@ -121,7 +163,6 @@ struct PasswordDetailView: View {
                                         .tint(Color(red: 0.51, green: 0.51, blue: 1))
                                 }
                                 
-                                // Przełączniki
                                 HStack(spacing: 16) {
                                     Toggle("Symbols", isOn: $useSymbols)
                                         .toggleStyle(.button)
@@ -132,12 +173,11 @@ struct PasswordDetailView: View {
                                         .tint(Color(red: 0.51, green: 0.51, blue: 1))
                                 }
                                 
-                                // Przycisk Update
                                 Button(action: {
-                                    print("Aktualizowanie hasła dla \(entry.title)")
-                                    // Tutaj wejdzie AES-GCM żeby zaszyfrować nowe hasło
+                                    generatedPasswordPlaceholder = generateRandomPassword(length: Int(passwordLength), symbols: useSymbols, numbers: useNumbers)
+                                    showingGeneratorAlert = true
                                 }) {
-                                    Text("Update Password")
+                                    Text("Generate & Apply")
                                         .font(.system(size: 14, weight: .bold))
                                         .foregroundColor(Color(red: 0.08, green: 0.08, blue: 0.4))
                                         .frame(maxWidth: .infinity)
@@ -152,30 +192,99 @@ struct PasswordDetailView: View {
                     }
                     .cornerRadius(16)
                     
-                    // --- USUWANIE ---
-                    Button(action: {
-                        print("Usuwanie wpisu: \(entry.title)")
-                        dismiss() // Powrót do listy
-                    }) {
-                        Label("Delete Entry", systemImage: "trash.fill")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(Color.red.opacity(0.8))
-                            .padding(.vertical, 24)
+                    if !isEditing {
+                        Button(action: {
+                            onDelete()
+                            dismiss()
+                        }) {
+                            Label("Delete Entry", systemImage: "trash.fill")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(Color.red.opacity(0.8))
+                                .padding(.vertical, 12)
+                        }
                     }
                 }
                 .padding(24)
             }
         }
         .navigationBarTitleDisplayMode(.inline)
-        // Podmiana koloru strzałki "Wstecz" na fioletowy
         .tint(Color(red: 0.51, green: 0.51, blue: 1))
+        .onAppear {
+            setupEditableFields()
+        }
+        .alert("Replace current password?", isPresented: $showingGeneratorAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Replace", role: .destructive) {
+                editablePassword = generatedPasswordPlaceholder
+                isEditing = true
+            }
+        } message: {
+            Text("New password: \(generatedPasswordPlaceholder)\n\nChanges will be saved permanently only after clicking 'Save' in the upper-right corner.")
+        }
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(isEditing ? "Save" : "Edit") {
+                    if isEditing {
+                        saveChanges()
+                    } else {
+                        isEditing = true
+                    }
+                }
+                .foregroundColor(Color(red: 0.51, green: 0.51, blue: 1))
+                .font(.system(size: 16, weight: .bold))
+            }
+        }
+    }
+    
+    private func setupEditableFields() {
+        editableUsername = entry.username
+        editableWebsite = entry.website
+        editablePassword = decryptedVaultPassword
+        editableCategory = entry.category.isEmpty ? "General" : entry.category
+    }
+    
+    private func saveChanges() {
+        guard let key = authManager.currentMasterKey else { return }
+        
+        if let index = vaultManager.entries.firstIndex(where: { $0.id == entry.id }) {
+            vaultManager.entries[index].username = editableUsername
+            vaultManager.entries[index].website = editableWebsite
+            vaultManager.entries[index].category = editableCategory // ZAPIS KATEGORII
+            
+            if editablePassword != decryptedVaultPassword {
+                do {
+                    let encrypted = try CryptoService.encrypt(plaintext: editablePassword, using: key)
+                    vaultManager.entries[index].ciphertext = encrypted.ciphertext
+                    vaultManager.entries[index].nonce = encrypted.nonce
+                } catch {
+                    print("[PasswordDetailView] ❌ Re-encryption failed: \(error)")
+                }
+            }
+            
+            let formatter = DateFormatter()
+            formatter.dateFormat = "dd MMM yyyy"
+            vaultManager.entries[index].lastModified = formatter.string(from: Date()).uppercased()
+            
+            self.entry = vaultManager.entries[index]
+        }
+        
+        vaultManager.saveToOfflineCache()
+        isEditing = false
+    }
+    
+    private func generateRandomPassword(length: Int, symbols: Bool, numbers: Bool) -> String {
+        var letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        if numbers { letters += "0123456789" }
+        if symbols { letters += "!@#$%^&*()_+-=[]{}|;:,.<>?" }
+        return String((0..<length).map { _ in letters.randomElement()! })
     }
 }
 
-// Komponent wiersza dla danych (Username, Password, itp.)
+// MARK: - DETAIL ROW COMPONENT (English Interface)
 struct DetailRow: View {
     let label: String
-    let value: String
+    @Binding var value: String
+    let isEditing: Bool
     var isCopyable: Bool = false
     var isSecure: Bool = false
     var actionIcon: String? = nil
@@ -189,46 +298,65 @@ struct DetailRow: View {
                 .foregroundColor(.gray)
             
             HStack {
-                if isSecure && !showPlaintext {
-                    Text(value)
-                        .font(.system(size: 18, weight: .black, design: .monospaced))
-                        .foregroundColor(.white)
+                if isEditing {
+                    Group {
+                        if isSecure && !showPlaintext {
+                            SecureField("", text: $value)
+                        } else {
+                            TextField("", text: $value)
+                                .autocapitalization(.none)
+                        }
+                    }
+                    .foregroundColor(.white)
+                    .font(.system(size: 14, design: .monospaced))
                 } else {
-                    Text(value)
-                        .font(.system(size: 14, design: .monospaced))
-                        .foregroundColor(Color(red: 0.76, green: 0.78, blue: 0.84))
+                    if isSecure && !showPlaintext {
+                        Text(String(repeating: "•", count: max(1, value.count)))
+                            .font(.system(size: 18, weight: .black, design: .monospaced))
+                            .foregroundColor(.white)
+                            .padding(.top, 4)
+                    } else {
+                        Text(value)
+                            .font(.system(size: 14, design: .monospaced))
+                            .foregroundColor(Color(red: 0.76, green: 0.78, blue: 0.84))
+                    }
                 }
                 
                 Spacer()
                 
-                HStack(spacing: 16) {
-                    if isSecure {
-                        Button(action: { showPlaintext.toggle() }) {
-                            Image(systemName: showPlaintext ? "eye.slash.fill" : "eye.fill")
-                                .foregroundColor(.gray)
+                if !isEditing {
+                    HStack(spacing: 16) {
+                        if isSecure {
+                            Button(action: { showPlaintext.toggle() }) {
+                                Image(systemName: showPlaintext ? "eye.slash.fill" : "eye.fill")
+                                    .foregroundColor(.gray)
+                            }
                         }
-                    }
-                    
-                    if isCopyable {
-                        Button(action: {
-                            // Kopiowanie do schowka
-                            UIPasteboard.general.string = value
-                        }) {
-                            Image(systemName: "doc.on.doc.fill")
-                                .foregroundColor(Color(red: 0.51, green: 0.51, blue: 1).opacity(0.8))
-                                .padding(8)
-                                .background(Color.white.opacity(0.05))
-                                .cornerRadius(8)
+                        
+                        if isCopyable {
+                            Button(action: {
+                                UIPasteboard.general.string = value
+                            }) {
+                                Image(systemName: "doc.on.doc.fill")
+                                    .foregroundColor(Color(red: 0.51, green: 0.51, blue: 1).opacity(0.8))
+                                    .padding(8)
+                                    .background(Color.white.opacity(0.05))
+                                    .cornerRadius(8)
+                            }
                         }
-                    }
-                    
-                    if let icon = actionIcon {
-                        Button(action: { /* Otwórz URL */ }) {
-                            Image(systemName: icon)
-                                .foregroundColor(.gray)
-                                .padding(8)
-                                .background(Color.white.opacity(0.05))
-                                .cornerRadius(8)
+                        
+                        if let icon = actionIcon {
+                            Button(action: {
+                                if let url = URL(string: "https://\(value)") {
+                                    UIApplication.shared.open(url)
+                                }
+                            }) {
+                                Image(systemName: icon)
+                                    .foregroundColor(.gray)
+                                    .padding(8)
+                                    .background(Color.white.opacity(0.05))
+                                    .cornerRadius(8)
+                            }
                         }
                     }
                 }
@@ -236,28 +364,6 @@ struct DetailRow: View {
             .padding()
             .background(Color(red: 0.16, green: 0.16, blue: 0.17))
             .cornerRadius(12)
-        }
-    }
-}
-
-// KRYTYCZNE DLA PODGLĄDU: Wstrzykujemy mockowane dane, żeby Canvas wiedział, co narysować!
-struct PasswordDetailView_Previews: PreviewProvider {
-    static var previews: some View {
-        // Tworzymy fejkowe dane specjalnie dla podglądu
-        let mockEntry = VaultEntry(
-            title: "GitHub",
-            username: "alex.dev_sanctuary",
-            website: "www.github.com",
-            ciphertext: "SZYFROGRAM_TUTAJ",
-            iv: "IV_TUTAJ",
-            category: "Work",
-            lastModified: "2 DAYS AGO",
-            iconName: "network"
-        )
-        
-        // Zamykamy w NavigationStack, żeby było widać stylizację paska nawigacji
-        NavigationStack {
-            PasswordDetailView(entry: mockEntry, onDelete: {})
         }
     }
 }

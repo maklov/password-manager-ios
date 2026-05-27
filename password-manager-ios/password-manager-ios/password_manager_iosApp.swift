@@ -11,11 +11,13 @@ import SwiftUI
 struct password_manager_iosApp: App {
     @StateObject private var vaultManager = LocalVaultManager()
     @StateObject private var navState = AppNavigationState()
+    @StateObject private var authManager = AuthManager()
     
     var body: some Scene {
         WindowGroup {
             AppRootView()
                 .environmentObject(vaultManager)
+                .environmentObject(authManager)
                 .environmentObject(navState)
         }
     }

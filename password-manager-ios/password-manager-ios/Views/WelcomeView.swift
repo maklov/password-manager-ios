@@ -61,16 +61,6 @@ struct WelcomeView: View {
             
             // Przyciski akcji
             VStack(spacing: 16) {
-                Button(action: onRegister) {
-                    Label("Create New Vault", systemImage: "shield.fill")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color(red: 0.51, green: 0.51, blue: 1))
-                        .foregroundColor(.black)
-                        .cornerRadius(16)
-                }
-                
                 Button(action: onLogin) {
                     Label("Enter Existing Vault", systemImage: "key.fill")
                         .font(.headline)
@@ -80,6 +70,16 @@ struct WelcomeView: View {
                         .foregroundColor(.white)
                         .cornerRadius(16)
                         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.1)))
+                }
+                
+                Button(action: onRegister) {
+                    Label("Create New Vault", systemImage: "shield.fill")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color(red: 0.51, green: 0.51, blue: 1))
+                        .foregroundColor(.black)
+                        .cornerRadius(16)
                 }
             }
             .padding(.horizontal, 24)

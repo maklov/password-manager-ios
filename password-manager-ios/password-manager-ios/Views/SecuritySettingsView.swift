@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SecuritySettingsView: View {
     @EnvironmentObject var navState: AppNavigationState
+    @EnvironmentObject var authManager: AuthManager
     @State private var biometricUnlock = true
     @State private var selfDestruct = false
     
@@ -47,7 +48,7 @@ struct SecuritySettingsView: View {
             }
             .padding(24)
             Button(action: {
-                    // TUTAJ W PRZYSZŁOŚCI: authManager.clearMasterKey() - ZABIJEMY KLUCZ W RAM
+                    authManager.logout() // ZABIJAMY KLUCZ W RAM
                     navState.currentRoute = .welcome // Powrót na ekran główny!
                 }) {
                     HStack {
@@ -65,6 +66,7 @@ struct SecuritySettingsView: View {
                 .padding(.bottom, 100) // Żeby nie wchodziło pod TabBar
             }
             .padding(24)
+            .background(Color(red: 0.07, green: 0.07, blue: 0.08))
         }
         }
 

@@ -3,7 +3,7 @@ import SwiftUI
 struct RegisterView: View {
     var onSuccess: () -> Void
     var onBack: () -> Void
-    
+      
     @State private var fullName: String = ""
     @State private var email: String = ""
     @State private var masterPassword: String = ""
@@ -28,7 +28,7 @@ struct RegisterView: View {
                             .foregroundColor(.white)
                     }
                     Spacer()
-                    Text("Vault Sentinel")
+                    Text("Vault 66")
                         .font(.headline)
                         .foregroundColor(.white)
                     Spacer()
@@ -129,12 +129,7 @@ struct RegisterView: View {
                             Text("Already have an account?")
                                 .foregroundColor(.gray)
                                 .font(.system(size: 14))
-                            Button(action: {
-                                // Zmieniamy stan na logowanie (w AppRootView)
-                                // Tutaj wywołujemy onBack dla uproszczenia (powrót do Welcome),
-                                // ale w przyszłości można dodać onSwitchToLogin
-                                onBack()
-                            }) {
+                            Button(action: onBack) {
                                 Text("Log in")
                                     .font(.system(size: 14, weight: .bold))
                                     .foregroundColor(.white)

@@ -1,6 +1,5 @@
 import SwiftUI
 
-// Stan aplikacji
 
 class AppNavigationState: ObservableObject {
     @Published var currentRoute: AppRoute = .welcome
@@ -14,7 +13,7 @@ enum AppRoute {
 }
 
 struct AppRootView: View {
-    @EnvironmentObject var navState: AppNavigationState // Odbieramy stan globalny
+    @EnvironmentObject var navState: AppNavigationState // stan globalny
     
     var body: some View {
         NavigationStack{
@@ -41,15 +40,18 @@ struct AppRootView: View {
             }
             .animation(.easeInOut, value: navState.currentRoute)
         }
+        .preferredColorScheme(.dark)
     }
 }
 struct AppRootView_Previews: PreviewProvider {
     static var previews: some View {
         let previewNavState = AppNavigationState()
         let previewVaultManager = LocalVaultManager()
+        let previewAuthManager = AuthManager()
         
         AppRootView()
             .environmentObject(previewNavState)
             .environmentObject(previewVaultManager)
+            .environmentObject(previewAuthManager)
     }
 }

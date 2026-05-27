@@ -3,15 +3,22 @@ import SwiftUI
 struct AddVaultEntryView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var vaultManager: LocalVaultManager
+    @EnvironmentObject var authManager: AuthManager
     
-    // Pola formularza
+    // Form States
     @State private var title: String = ""
     @State private var username: String = ""
     @State private var website: String = ""
-    @State private var plaintextPassword: String = "" // Na razie wpisujemy jawnie
+    @State private var plaintextPassword: String = ""
     @State private var selectedCategory: String = "Social"
     
-    let categories = ["All", "Finance", "Social", "Work", "Notes"]
+    // --- PASWORD GENERATOR STATES ---
+    @State private var showGenerator: Bool = false // Hidden by default, can be toggled
+    @State private var passwordLength: Double = 16
+    @State private var useSymbols: Bool = true
+    @State private var useNumbers: Bool = true
+    
+    let categories = ["Finance", "Social", "Work", "Notes", "General"]
     
     var body: some View {
         NavigationStack {
@@ -20,100 +27,213 @@ struct AddVaultEntryView: View {
                 
                 ScrollView {
                     VStack(spacing: 24) {
-                        // Pola wprowadzania danych
+                        // Input Fields
                         VStack(spacing: 16) {
                             EntryField(label: "TITLE (e.g. GitHub)", text: $title)
-                            EntryField(label: "USERNAME OR EMAIL", text: $username)
                             EntryField(label: "WEBSITE (e.g. github.com)", text: $website)
+                            EntryField(label: "USERNAME OR EMAIL", text: $username)
+                            
+                            // Password Field with Visibility Eye
                             EntryField(label: "PASSWORD", text: $plaintextPassword, isSecure: true)
                         }
-                        // Wybór kategorii
+                        
+                        // --- INTEGRATED INLINE GENERATOR ---
+                        VStack(spacing: 0) {
+                            Button(action: {
+                                withAnimation { showGenerator.toggle() }
+                            }) {
+                                HStack {
+                                    Image(systemName: "wand.and.stars")
+                                    Text("Generate Strong Password")
+                                    Spacer()
+                                    Image(systemName: showGenerator ? "chevron.down" : "chevron.right")
+                                }
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundColor(Color(red: 0.51, green: 0.51, blue: 1))
+                                .padding()
+                                .background(Color(red: 0.12, green: 0.12, blue: 0.13))
+                            }
+                            
+                            if showGenerator {
+                                VStack(spacing: 16) {
+                                    // Length Control
+                                    VStack(spacing: 8) {
+                                        HStack {
+                                            Text("Length")
+                                                .font(.system(size: 13))
+                                                .foregroundColor(.white)
+                                            Spacer()
+                                            Text("\(Int(passwordLength))")
+                                                .font(.caption).bold()
+                                                .padding(.horizontal, 8).padding(.vertical, 4)
+                                                .background(Color(red: 0.51, green: 0.51, blue: 1).opacity(0.2))
+                                                .foregroundColor(Color(red: 0.51, green: 0.51, blue: 1))
+                                                .cornerRadius(8)
+                                        }
+                                        Slider(value: $passwordLength, in: 8...32, step: 1)
+                                            .tint(Color(red: 0.51, green: 0.51, blue: 1))
+                                    }
+                                    
+                                    // Toggles
+                                    HStack(spacing: 16) {
+                                        Toggle("Symbols", isOn: $useSymbols)
+                                            .toggleStyle(.button)
+                                            .tint(Color(red: 0.51, green: 0.51, blue: 1))
+                                        
+                                        Toggle("Numbers", isOn: $useNumbers)
+                                            .toggleStyle(.button)
+                                            .tint(Color(red: 0.51, green: 0.51, blue: 1))
+                                        Spacer()
+                                    }
+                                    
+                                    // Action Button to apply
+                                    Button(action: {
+                                        plaintextPassword = generateRandomPassword(
+                                            length: Int(passwordLength),
+                                            symbols: useSymbols,
+                                            numbers: useNumbers
+                                        )
+                                    }) {
+                                        Text("Generate & Autofill")
+                                            .font(.system(size: 13, weight: .bold))
+                                            .foregroundColor(.black)
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, 10)
+                                            .background(Color(red: 0.51, green: 0.51, blue: 1))
+                                            .cornerRadius(8)
+                                    }
+                                }
+                                .padding()
+                                .background(Color(red: 0.16, green: 0.16, blue: 0.17).opacity(0.5))
+                            }
+                        }
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.white.opacity(0.05), lineWidth: 1)
+                        )
+                        
+                        // Category Selector
                         VStack(alignment: .leading, spacing: 12) {
                             Text("CATEGORY")
                                 .font(.system(size: 11, weight: .bold))
                                 .foregroundColor(.gray)
                             
                             Picker("Category", selection: $selectedCategory) {
-                                ForEach(categories.filter { $0 != "All" }, id: \.self) { category in
+                                ForEach(categories, id: \.self) { category in
                                     Text(category).tag(category)
                                 }
                             }
                             .pickerStyle(.segmented)
-                            // Kolorowanie segmentów to zawiła sprawa w SwiftUI, ale ten podstawowy zadziała
+                            .tint(Color(red: 0.51, green: 0.51, blue: 1))
                         }
                         .padding(.top, 8)
                         
-                        // Przycisk Zapisu
+                        // Save Button
                         Button(action: {
-                            // 1. W PRZYSZŁOŚCI: Tutaj zaszyfrujemy plaintextPassword przez AES!
-                            // 2. Tworzymy nowy obiekt
-                            let newEntry = VaultEntry(
-                                title: title.isEmpty ? "Untitled" : title,
-                                username: username,
-                                website: website,
-                                ciphertext: plaintextPassword, // Na razie trzymamy czyste hasło dla testów UI
-                                iv: "dummy_iv",
-                                category: selectedCategory,
-                                lastModified: "JUST NOW",
-                                iconName: "key.fill" // Domyślna ikona
-                            )
-                            
-                            // 3. Zapisujemy do RAM i Offline
-                            vaultManager.entries.append(newEntry)
-                            vaultManager.saveToOfflineCache()
-                            
-                            // 4. Zamykamy ekran
-                            dismiss()
+                            saveNewEntry()
                         }) {
                             Text("Save to Vault")
                                 .font(.system(size: 16, weight: .bold))
                                 .foregroundColor(Color(red: 0.08, green: 0.08, blue: 0.4))
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 16)
-                                .background(Color(red: 0.51, green: 0.51, blue: 1))
+                                .background(title.isEmpty || plaintextPassword.isEmpty ? Color.gray.opacity(0.3) : Color(red: 0.51, green: 0.51, blue: 1))
                                 .cornerRadius(12)
-                            }
-                            .padding(.top, 24)
                         }
-                        .padding(24)
+                        .disabled(title.isEmpty || plaintextPassword.isEmpty)
+                        .padding(.top, 16)
                     }
+                    .padding(24)
                 }
-                .navigationTitle("New Entry")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button("Cancel") { dismiss() }
-                            .foregroundColor(.gray)
-                    }
+            }
+            .navigationTitle("New Entry")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundColor(.gray)
                 }
-                // Zmiana koloru tytułu nawigacji
-                .toolbarColorScheme(.dark, for: .navigationBar)
-                .toolbarBackground(Color(red: 0.07, green: 0.07, blue: 0.08), for: .navigationBar)
-                .toolbarBackground(.visible, for: .navigationBar)
+            }
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarBackground(Color(red: 0.07, green: 0.07, blue: 0.08), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
         }
+    }
+    
+    // MARK: - Core Logic Helpers
+    
+    private func saveNewEntry() {
+        guard let masterKey = authManager.currentMasterKey else { return }
+        
+        do {
+            let encryptedData = try CryptoService.encrypt(plaintext: plaintextPassword, using: masterKey)
+            let formatter = DateFormatter()
+            formatter.dateFormat = "dd MMM yyyy"
+            let dateString = formatter.string(from: Date()).uppercased()
+            
+            let newEntry = VaultEntry(
+                id: UUID().uuidString,
+                title: title,
+                username: username,
+                website: website,
+                ciphertext: encryptedData.ciphertext,
+                nonce: encryptedData.nonce,
+                category: selectedCategory,
+                lastModified: dateString,
+                iconName: "key.fill"
+            )
+            
+            vaultManager.entries.append(newEntry)
+            vaultManager.saveToOfflineCache()
+            dismiss()
+        } catch {
+            print("❌ Failed to encrypt and save entry: \(error)")
+        }
+    }
+    
+    private func generateRandomPassword(length: Int, symbols: Bool, numbers: Bool) -> String {
+        var letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        if numbers { letters += "0123456789" }
+        if symbols { letters += "!@#$%^&*()_+-=[]{}|;:,.<>?" }
+        
+        return String((0..<length).map { _ in letters.randomElement()! })
     }
 }
 
-    // Pomocnicze pole tekstowe
+// MARK: - ENTRY FIELD COMPONENT (With Eye Toggle support)
 struct EntryField: View {
     let label: String
     @Binding var text: String
     var isSecure: Bool = false
+    
+    @State private var isPasswordVisible: Bool = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(label)
                 .font(.system(size: 11, weight: .bold))
                 .foregroundColor(.gray)
-            Group {
+            
+            HStack {
+                Group {
+                    if isSecure && !isPasswordVisible {
+                        SecureField("", text: $text)
+                    } else {
+                        TextField("", text: $text)
+                            .autocapitalization(.none)
+                    }
+                }
+                .foregroundColor(.white)
+                .font(.system(size: 14, design: .monospaced))
+                
                 if isSecure {
-                    SecureField("", text: $text)
-                } else {
-                    TextField("", text: $text)
-                        .autocapitalization(.none)
+                    Button(action: { isPasswordVisible.toggle() }) {
+                        Image(systemName: isPasswordVisible ? "eye.slash.fill" : "eye.fill")
+                            .foregroundColor(.gray)
+                    }
                 }
             }
-            .foregroundColor(.white)
             .padding()
             .background(Color(red: 0.16, green: 0.16, blue: 0.17))
             .cornerRadius(12)

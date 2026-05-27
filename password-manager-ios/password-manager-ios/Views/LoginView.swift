@@ -1,11 +1,12 @@
 import SwiftUI
 
 struct LoginView: View {
+    @EnvironmentObject var authManager: AuthManager
     var onSuccess: () -> Void
     var onBack: () -> Void
     
     @State private var email: String = ""
-    @State private var password: String = ""
+    @State private var passwordInput: String = ""
     @State private var rememberEmail: Bool = true
     
     var body: some View {
@@ -13,7 +14,6 @@ struct LoginView: View {
             Color(red: 0.07, green: 0.07, blue: 0.08).ignoresSafeArea()
             
             VStack(spacing: 24) {
-                // Pasek nawigacji (Cofnij)
                 HStack {
                     Button(action: onBack) {
                         Image(systemName: "chevron.left")
@@ -21,7 +21,7 @@ struct LoginView: View {
                             .foregroundColor(.white)
                     }
                     Spacer()
-                    Text("Vault Sentinel")
+                    Text("Vault 66")
                         .font(.headline)
                         .foregroundColor(.white)
                     Spacer()
@@ -46,7 +46,7 @@ struct LoginView: View {
                                 )
                             
                             VStack(spacing: 8) {
-                                Text("Vault Sentinel")
+                                Text("Vault 66")
                                     .font(.system(size: 32, weight: .heavy))
                                     .foregroundColor(.white)
                                 Text("Welcome back")
@@ -86,7 +86,7 @@ struct LoginView: View {
                                     Image(systemName: "lock.fill")
                                         .foregroundColor(.gray)
                                         .frame(width: 24)
-                                    SecureField("••••••••", text: $password)
+                                    SecureField("••••••••", text: $passwordInput)
                                         .foregroundColor(.white)
                                     Image(systemName: "eye.slash.fill")
                                         .foregroundColor(.gray)
@@ -117,9 +117,11 @@ struct LoginView: View {
                         .padding(.horizontal, 24)
                         
                         // Główny przycisk logowania
-                        Button(action: onSuccess) { // Tymczasowo od razu przenosi do aplikacji
+                        Button(action: {
+                            authManager.loginWith(masterPassword: passwordInput)
+                        }) { // Tymczasowo od razu przenosi do aplikacji
                             HStack {
-                                Text("Next")
+                                Text("Sign In")
                                 Image(systemName: "arrow.right")
                             }
                             .font(.system(size: 18, weight: .bold))
@@ -132,11 +134,22 @@ struct LoginView: View {
                         }
                         .padding(.horizontal, 24)
                         .padding(.top, 16)
+                        .onChange(of: authManager.isAuthenticated) { isAuthenticated in
+                            if isAuthenticated {
+                                onSuccess() // To przekaże sygnał do AppRootView, żeby zmienić ekran na .mainTab!
+                            }
+                        }
                         
-                        // Stempel AES
+                        if authManager.isBiometricAvailable {
+                            Button(action: {
+                                authManager.loginWithFaceID()
+                            }) {
+                                Image(systemName: "faceid")
+                            }
+                        }
                         HStack(spacing: 8) {
                             Circle().fill(Color.purple).frame(width: 6, height: 6)
-                            Text("ENCRYPTED VIA AES-256 BIT")
+                            Text("ENCRYPTED VIA AES-GCM")
                                 .font(.system(size: 11, weight: .bold))
                                 .foregroundColor(.gray)
                         }

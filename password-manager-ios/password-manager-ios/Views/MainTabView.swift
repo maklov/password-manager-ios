@@ -104,7 +104,7 @@ struct PlaceholderView: View {
                     .font(.title2)
                     .fontWeight(.bold)
                     .foregroundColor(.white)
-                Text("Module under encryption...")
+                Text("Module under encryption.")
                     .font(.caption)
                     .foregroundColor(.gray)
             }

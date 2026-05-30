@@ -7,8 +7,7 @@ struct ProfileView: View {
     // @AppStorage automatycznie zapisuje te dane na stałe w pamięci urządzenia
     @AppStorage("profile_first_name") private var firstName: String = "John"
     @AppStorage("profile_last_name") private var lastName: String = "Doe"
-    @AppStorage("profile_email") private var email: String = "john.doe@example.com"
-    
+    @AppStorage("last_logged_email") private var email: String = ""
     // Stany do obsługi trybu edycji
     @State private var isEditing: Bool = false
     @State private var editFirstName: String = ""

@@ -24,13 +24,16 @@ class AuthManager: ObservableObject {
             
             self.currentMasterKey = key
             saveKeyToKeychain(key: key)
-                        
+            
+            let isFirstLogin = UserDefaults.standard.string(forKey: "last_logged_email") == nil
+
+            if isFirstLogin {
+                // Włączamy Face ID domyślnie TYLKO za pierwszym razem
+                UserDefaults.standard.set(true, forKey: "biometric_unlock_enabled")
+            }
             // 1. Zapisujemy adres e-mail do autouzupełniania na przyszłość
             UserDefaults.standard.set(email, forKey: "last_logged_email")
             
-            // 2. Od teraz pozwalamy na używanie Face ID (Trust on First Use)!
-            UserDefaults.standard.set(true, forKey: "biometric_unlock_enabled")
-                        
             DispatchQueue.main.async {
                 self.isAuthenticated = true
             }

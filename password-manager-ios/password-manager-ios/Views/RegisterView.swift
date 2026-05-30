@@ -4,15 +4,36 @@ struct RegisterView: View {
     var onSuccess: () -> Void
     var onBack: () -> Void
       
-    @State private var fullName: String = ""
-    @State private var email: String = ""
-    @State private var masterPassword: String = ""
-    @State private var confirmPassword: String = ""
+    @State private var fullNameInput: String = ""
+    @State private var emailInput: String = ""
+    @State private var masterPasswordInput: String = ""
+    @State private var confirmPasswordInput: String = ""
     
     // Prosta logika siły hasła (do rozbudowy)
     private var passwordStrength: Double {
-        let length = Double(masterPassword.count)
+        let length = Double(masterPasswordInput.count)
         return min(length / 12.0, 1.0) // Pełny pasek przy 12 znakach
+    }
+    private func handleCreateAccount() {
+        // 1. Zapisanie e-maila
+        UserDefaults.standard.set(emailInput, forKey: "last_logged_email")
+        
+        // 2. Przetworzenie i zapisanie imienia/nazwiska
+        let nameComponents = fullNameInput.trimmingCharacters(in: .whitespaces).components(separatedBy: " ")
+        
+        if let firstName = nameComponents.first {
+            UserDefaults.standard.set(firstName, forKey: "profile_first_name")
+        }
+        
+        if nameComponents.count > 1 {
+            let lastName = nameComponents.dropFirst().joined(separator: " ")
+            UserDefaults.standard.set(lastName, forKey: "profile_last_name")
+        } else {
+            UserDefaults.standard.set("", forKey: "profile_last_name")
+        }
+        
+        // 3. Po wykonaniu całej "brudnej roboty" wywołujemy Twój callback
+        onSuccess()
     }
     
     var body: some View {
@@ -62,8 +83,8 @@ struct RegisterView: View {
                         
                         // Pola
                         VStack(spacing: 20) {
-                            RegisterField(title: "FULL NAME", placeholder: "Julian Thorne", text: $fullName)
-                            RegisterField(title: "EMAIL ADDRESS", placeholder: "julian@sentinel.com", text: $email)
+                            RegisterField(title: "FULL NAME", placeholder: "Julian Thorne", text: $fullNameInput)
+                            RegisterField(title: "EMAIL ADDRESS", placeholder: "julian@sentinel.com", text: $emailInput)
                             
                             // Master Password z siłą hasła
                             VStack(alignment: .leading, spacing: 8) {
@@ -71,7 +92,7 @@ struct RegisterView: View {
                                     .font(.system(size: 11, weight: .bold))
                                     .foregroundColor(.gray)
                                 HStack {
-                                    SecureField("••••••••••••", text: $masterPassword)
+                                    SecureField("••••••••••••", text: $masterPasswordInput)
                                         .foregroundColor(.white)
                                     Image(systemName: "eye.slash.fill")
                                         .foregroundColor(.gray)
@@ -105,14 +126,14 @@ struct RegisterView: View {
                                 .frame(height: 4)
                             }
                             
-                            RegisterField(title: "CONFIRM PASSWORD", placeholder: "••••••••••••", text: $confirmPassword, isSecure: true)
+                            RegisterField(title: "CONFIRM PASSWORD", placeholder: "••••••••••••", text: $confirmPasswordInput, isSecure: true)
                         }
                         
                         // Przycisk Rejestracji
-                        Button(action: onSuccess) {
+                        Button(action: handleCreateAccount) {
                             HStack {
                                 Text("Create Account")
-                                Image(systemName: "waveform.path") // Zbliżone do ikony ze Stitcha
+                                Image(systemName: "waveform.path")
                             }
                             .font(.system(size: 18, weight: .bold))
                             .foregroundColor(Color(red: 0.08, green: 0.08, blue: 0.4))

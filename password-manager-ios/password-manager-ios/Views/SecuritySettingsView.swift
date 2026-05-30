@@ -3,8 +3,7 @@ import SwiftUI
 struct SecuritySettingsView: View {
     @EnvironmentObject var navState: AppNavigationState
     @EnvironmentObject var authManager: AuthManager
-    @State private var biometricUnlock = true
-    @State private var selfDestruct = false
+    @AppStorage("biometric_unlock_enabled") private var biometricUnlockEnabled: Bool = false
     
     var body: some View {
         ScrollView {
@@ -39,9 +38,8 @@ struct SecuritySettingsView: View {
                 
                 // Togle i linki
                 VStack(spacing: 1) {
-                    SecurityToggle(title: "Biometric Unlock", subtitle: "FaceID / TouchID Protocol", isOn: $biometricUnlock, icon: "faceid")
+                    SecurityToggle(title: "Biometric Unlock", subtitle: "FaceID / TouchID Protocol", isOn: $biometricUnlockEnabled, icon: "faceid")
                     SecurityRow(title: "Auto-lock Timeout", subtitle: "Immediately", icon: "timer")
-                    SecurityToggle(title: "Self-Destruct", subtitle: "Erase data after 10 failures", isOn: $selfDestruct, icon: "exclamationmark.triangle", color: .red)
                 }
                 .background(Color.white.opacity(0.03))
                 .cornerRadius(20)

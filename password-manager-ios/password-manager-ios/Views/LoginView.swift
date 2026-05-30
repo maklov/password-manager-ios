@@ -5,9 +5,11 @@ struct LoginView: View {
     var onSuccess: () -> Void
     var onBack: () -> Void
     
-    @State private var email: String = ""
+    @State private var emailInput: String = ""
     @State private var passwordInput: String = ""
     @State private var rememberEmail: Bool = true
+    @AppStorage("biometric_unlock_enabled") private var biometricUnlockEnabled: Bool = false
+    @AppStorage("last_logged_email") private var savedEmail: String = ""
     
     var body: some View {
         ZStack {
@@ -67,7 +69,7 @@ struct LoginView: View {
                                     Image(systemName: "envelope.fill")
                                         .foregroundColor(.gray)
                                         .frame(width: 24)
-                                    TextField("name@domain.com", text: $email)
+                                    TextField("name@domain.com", text: $emailInput)
                                         .foregroundColor(.white)
                                         .keyboardType(.emailAddress)
                                         .autocapitalization(.none)
@@ -118,7 +120,7 @@ struct LoginView: View {
                         
                         // Główny przycisk logowania
                         Button(action: {
-                            authManager.loginWith(masterPassword: passwordInput)
+                            authManager.loginWith(masterPassword: passwordInput, email: emailInput)
                         }) { // Tymczasowo od razu przenosi do aplikacji
                             HStack {
                                 Text("Sign In")
@@ -140,13 +142,21 @@ struct LoginView: View {
                             }
                         }
                         
-                        if authManager.isBiometricAvailable {
+                        if biometricUnlockEnabled {
                             Button(action: {
                                 authManager.loginWithFaceID()
                             }) {
                                 Image(systemName: "faceid")
+                                    .font(.system(size: 32))
+                                    .foregroundColor(Color(red: 0.51, green: 0.51, blue: 1))
                             }
+                        } else {
+                            // Jeśli biometria jest wyłączona, wyświetlamy informację, że trzeba użyć hasła
+                            Text("Biometrics disabled in settings")
+                                .font(.system(size: 12))
+                                .foregroundColor(.gray)
                         }
+                        
                         HStack(spacing: 8) {
                             Circle().fill(Color.purple).frame(width: 6, height: 6)
                             Text("ENCRYPTED VIA AES-GCM")
@@ -161,6 +171,17 @@ struct LoginView: View {
                     }
                     .padding(.bottom, 40)
                 }
+            }
+        }
+        .onAppear {
+            // Jeśli system ma w pamięci jakiegoś maila, od razu wpisz go w pole!
+            if !savedEmail.isEmpty {
+                emailInput = savedEmail
+            }
+            
+            // Jeśli Face ID jest włączone i mamy maila, automatycznie uruchom skaner
+            if biometricUnlockEnabled && !savedEmail.isEmpty {
+                authManager.loginWithFaceID()
             }
         }
     }

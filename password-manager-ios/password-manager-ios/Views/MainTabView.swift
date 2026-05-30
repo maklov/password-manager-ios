@@ -39,7 +39,7 @@ struct MainTabView: View {
                     PlaceholderView(title: "Sharing Protocol", icon: "person.2.badge.key")
                 case .profile:
                     // Placeholder dla profilu
-                    PlaceholderView(title: "Identity Sanctuary", icon: "person.text.rectangle")
+                    ProfileView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

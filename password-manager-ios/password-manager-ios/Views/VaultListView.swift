@@ -1,23 +1,25 @@
 import SwiftUI
 
 struct VaultListView: View {
-    @StateObject private var vaultManager = LocalVaultManager()
+    @EnvironmentObject var vaultManager: LocalVaultManager
+    @EnvironmentObject var authManager: AuthManager
+    
     @State private var searchText = ""
     @State private var selectedCategory = "All"
     @State private var showingAddEntry = false
+    
+    // Stan fokusu klawiatury
+    @FocusState private var isSearchFocused: Bool
 
-    let categories = ["All", "Finance", "Social", "Work", "Notes"]
+    let categories = ["All", "Finance", "Social", "Work", "Notes", "General"]
 
-    // POPRAWIONE FILTROWANIE: Bezpieczne dopasowanie kategorii i tekstu
     var filteredEntries: [VaultEntry] {
         var result = vaultManager.entries
         
-        // 1. Filtrowanie po kategorii (case-insensitive)
         if selectedCategory != "All" {
             result = result.filter { $0.category.localizedCaseInsensitiveCompare(selectedCategory) == .orderedSame }
         }
         
-        // 2. Filtrowanie po tekście wyszukiwarki
         if !searchText.isEmpty {
             result = result.filter {
                 $0.title.localizedCaseInsensitiveContains(searchText) ||
@@ -31,7 +33,12 @@ struct VaultListView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(red: 0.07, green: 0.07, blue: 0.08).ignoresSafeArea()
+                // Tło reagujące na dotyk - kliknięcie w puste miejsce zamyka klawiaturę
+                Color(red: 0.07, green: 0.07, blue: 0.08)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        isSearchFocused = false
+                    }
                 
                 VStack(spacing: 0) {
                     // --- SEARCH BAR & HEADER ---
@@ -50,18 +57,45 @@ struct VaultListView: View {
                         .padding(.horizontal, 24)
                         .padding(.top, 16)
                         
-                        // Search Field
-                        HStack {
-                            Image(systemName: "magnifyingglass")
-                                .foregroundColor(.gray)
-                            TextField("Search vault...", text: $searchText)
-                                .foregroundColor(.white)
-                                .autocapitalization(.none)
+                        // --- ZMODYFIKOWANY SYSTEM WYSZUKIWANIA ---
+                        HStack(spacing: 12) {
+                            HStack {
+                                Image(systemName: "magnifyingglass")
+                                    .foregroundColor(.gray)
+                                
+                                TextField("Search vault...", text: $searchText)
+                                    .focused($isSearchFocused) // Podpinamy kontrolę klawiatury
+                                    .foregroundColor(.white)
+                                    .autocapitalization(.none)
+                                    .disableAutocorrection(true)
+                                
+                                // Przycisk "X" czyszczący tekst (pojawia się tylko gdy coś wpiszemy)
+                                if !searchText.isEmpty {
+                                    Button(action: { searchText = "" }) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundColor(.gray)
+                                    }
+                                }
+                            }
+                            .padding()
+                            .background(Color(red: 0.16, green: 0.16, blue: 0.17))
+                            .cornerRadius(12)
+                            
+                            // Przycisk "Cancel" (Wsuwa się tylko gdy pole jest aktywne)
+                            if isSearchFocused {
+                                Button("Cancel") {
+                                    withAnimation {
+                                        searchText = ""
+                                        isSearchFocused = false
+                                    }
+                                }
+                                .foregroundColor(Color(red: 0.51, green: 0.51, blue: 1))
+                                .font(.system(size: 16, weight: .bold))
+                                .transition(.move(edge: .trailing).combined(with: .opacity))
+                            }
                         }
-                        .padding()
-                        .background(Color(red: 0.16, green: 0.16, blue: 0.17))
-                        .cornerRadius(12)
                         .padding(.horizontal, 24)
+                        .animation(.easeInOut, value: isSearchFocused) // Animacja wysuwania przycisku
                     }
                     .padding(.bottom, 12)
                     
@@ -96,6 +130,11 @@ struct VaultListView: View {
                                 .foregroundColor(.gray)
                             Spacer()
                         }
+                        // Nawet puste miejsce reaguje na kliknięcie zamykające klawiaturę
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            isSearchFocused = false
+                        }
                     } else {
                         List {
                             ForEach(filteredEntries) { entry in
@@ -104,7 +143,10 @@ struct VaultListView: View {
                                         vaultManager.entries.remove(at: index)
                                         vaultManager.saveToOfflineCache()
                                     }
-                                })) {
+                                })
+                                .environmentObject(vaultManager)
+                                .environmentObject(authManager)
+                                ) {
                                     HStack(spacing: 16) {
                                         ZStack {
                                             RoundedRectangle(cornerRadius: 12)
@@ -131,27 +173,19 @@ struct VaultListView: View {
                             }
                         }
                         .listStyle(.plain)
+                        // Natywne zamykanie klawiatury przy przewijaniu listy (iOS 16+)
+                        .scrollDismissesKeyboard(.interactively)
                     }
                 }
             }
         }
         .sheet(isPresented: $showingAddEntry) {
             AddVaultEntryView()
+                .environmentObject(vaultManager)
+                .environmentObject(authManager)
         }
         .onAppear {
             vaultManager.loadFromOfflineCache()
         }
     }
-}
-
-struct VaultListView_Previews: PreviewProvider {
-
-    static var previews: some View {
-
-        VaultListView()
-            .environmentObject(LocalVaultManager()) // <-- MUSZĄ BYĆ NAWIASY
-            .environmentObject(AuthManager())
-
-    }
-
 }

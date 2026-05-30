@@ -11,6 +11,7 @@
 		9F405D9C2FBE3DE50078F939 /* AuthenticationServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9F405D9B2FBE3DE50078F939 /* AuthenticationServices.framework */; };
 		9F405DAE2FBE435E0078F939 /* VaultModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5A5889C2F73416E004C0FEC /* VaultModels.swift */; };
 		9F405DAF2FBE43670078F939 /* CryptoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5548F8A2FAA8162008F9DAC /* CryptoService.swift */; };
+		9F8313F92FC77B47009942A7 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F8313F82FC77B47009942A7 /* ProfileView.swift */; };
 		9F9806FA2FB3AFB500C304D2 /* AppRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F9806F92FB3AFB500C304D2 /* AppRootView.swift */; };
 		9F9806FC2FB3B01900C304D2 /* VaultListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F9806FB2FB3B01900C304D2 /* VaultListView.swift */; };
 		D51B581C2F71FD250060F2D6 /* password_manager_iosApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D51B581B2F71FD250060F2D6 /* password_manager_iosApp.swift */; };
@@ -53,6 +54,7 @@
 /* Begin PBXFileReference section */
 		9F405D992FBE3DE50078F939 /* Vault66Autofill.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = Vault66Autofill.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		9F405D9B2FBE3DE50078F939 /* AuthenticationServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AuthenticationServices.framework; path = System/Library/Frameworks/AuthenticationServices.framework; sourceTree = SDKROOT; };
+		9F8313F82FC77B47009942A7 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		9F9806F92FB3AFB500C304D2 /* AppRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRootView.swift; sourceTree = "<group>"; };
 		9F9806FB2FB3B01900C304D2 /* VaultListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultListView.swift; sourceTree = "<group>"; };
 		D51B58182F71FD250060F2D6 /* password-manager-ios.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "password-manager-ios.app"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -226,6 +228,7 @@
 				D5548F942FAA8730008F9DAC /* AddVaultEntryView.swift */,
 				9F9806F92FB3AFB500C304D2 /* AppRootView.swift */,
 				9F9806FB2FB3B01900C304D2 /* VaultListView.swift */,
+				9F8313F82FC77B47009942A7 /* ProfileView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -413,6 +416,7 @@
 				D5A5889D2F73416F004C0FEC /* VaultModels.swift in Sources */,
 				D5548F952FAA8730008F9DAC /* AddVaultEntryView.swift in Sources */,
 				D5548F8B2FAA8162008F9DAC /* CryptoService.swift in Sources */,
+				9F8313F92FC77B47009942A7 /* ProfileView.swift in Sources */,
 				9F9806FA2FB3AFB500C304D2 /* AppRootView.swift in Sources */,
 				D5548F912FAA81BB008F9DAC /* LocalVaultManager.swift in Sources */,
 				D57707522F9E4DE800F3253B /* LoginView.swift in Sources */,

@@ -12,6 +12,8 @@ struct password_manager_iosApp: App {
     @StateObject private var vaultManager = LocalVaultManager()
     @StateObject private var navState = AppNavigationState()
     @StateObject private var authManager = AuthManager()
+    @StateObject private var autoLockManager = AutoLockManager()
+
     
 //    @Environment(\.scenePhase) private var scenePhase
     @AppStorage("background_timestamp") private var backgroundTimestamp: Double = 0
@@ -23,6 +25,7 @@ struct password_manager_iosApp: App {
                 .environmentObject(vaultManager)
                 .environmentObject(authManager)
                 .environmentObject(navState)
+                .environmentObject(autoLockManager)
         }
     }
 }

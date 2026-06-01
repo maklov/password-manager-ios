@@ -1,6 +1,5 @@
 import SwiftUI
 
-// Enum definiujący nasze pola tekstowe dla systemu Autofocus
 enum FocusField: Hashable {
     case title, website, username, password
 }
@@ -10,19 +9,16 @@ struct AddVaultEntryView: View {
     @EnvironmentObject var vaultManager: LocalVaultManager
     @EnvironmentObject var authManager: AuthManager
     
-    // Form States
     @State private var title: String = ""
     @State private var username: String = ""
     @State private var website: String = ""
     @State private var plaintextPassword: String = ""
     @State private var selectedCategory: String = "Social"
     
-    // Sterowanie Fokusem Klawiatury
     @FocusState private var focusedField: FocusField?
     
-    // --- PASWORD GENERATOR STATES ---
     @State private var showGenerator: Bool = false
-    @State private var passwordLength: Double = 20 // Optymalne 20 znaków dla stylu Apple
+    @State private var passwordLength: Double = 20
     @State private var useSymbols: Bool = true
     @State private var useNumbers: Bool = true
     
@@ -36,33 +32,30 @@ struct AddVaultEntryView: View {
                 ScrollView {
                     VStack(spacing: 24) {
                         
-                        // --- INPUT FIELDS Z OBSŁUGĄ KLAWISZA ENTER ---
                         VStack(spacing: 16) {
                             EntryField(label: "TITLE (e.g. GitHub)", text: $title, submitLabel: .next) {
-                                focusedField = .website // Przeskok do strony
+                                focusedField = .website
                             }
                             .focused($focusedField, equals: .title)
                             
                             EntryField(label: "WEBSITE (e.g. github.com)", text: $website, submitLabel: .next) {
-                                focusedField = .username // Przeskok do loginu
+                                focusedField = .username
                             }
                             .focused($focusedField, equals: .website)
                             
                             EntryField(label: "USERNAME OR EMAIL", text: $username, submitLabel: .next) {
-                                focusedField = .password // Przeskok do hasła
+                                focusedField = .password
                             }
                             .focused($focusedField, equals: .username)
                             
                             EntryField(label: "PASSWORD", text: $plaintextPassword, isSecure: true, submitLabel: .done) {
-                                focusedField = nil // Zamknięcie klawiatury
+                                focusedField = nil
                             }
                             .focused($focusedField, equals: .password)
                         }
                         
-                        // --- INTEGRATED INLINE GENERATOR ---
                         VStack(spacing: 0) {
                             Button(action: {
-                                // Chowamy klawiaturę przy otwieraniu generatora
                                 focusedField = nil
                                 withAnimation { showGenerator.toggle() }
                             }) {
@@ -134,7 +127,6 @@ struct AddVaultEntryView: View {
                                 .stroke(Color.white.opacity(0.05), lineWidth: 1)
                         )
                         
-                        // Category Selector
                         VStack(alignment: .leading, spacing: 12) {
                             Text("CATEGORY")
                                 .font(.system(size: 11, weight: .bold))
@@ -150,7 +142,6 @@ struct AddVaultEntryView: View {
                         }
                         .padding(.top, 8)
                         
-                        // Save Button
                         Button(action: {
                             saveNewEntry()
                         }) {
@@ -179,14 +170,11 @@ struct AddVaultEntryView: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbarBackground(Color(red: 0.07, green: 0.07, blue: 0.08), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
-            // Automatyczne ustawienie kursora w tytule przy wejściu na ekran
             .onAppear {
                 focusedField = .title
             }
         }
     }
-    
-    // MARK: - Core Logic Helpers
     
     private func saveNewEntry() {
         guard let masterKey = authManager.currentMasterKey else { return }
@@ -211,23 +199,29 @@ struct AddVaultEntryView: View {
             
             vaultManager.entries.append(newEntry)
             vaultManager.saveToOfflineCache()
+            
+            // PUSH NA SERWER JEŚLI MAMY TOKEN
+            if let token = authManager.currentAPIToken {
+                vaultManager.pushChangesToServer(entry: newEntry, token: token)
+
+                print("[LocalVaultManager] 🚀 Próba wysyłki na serwer...")
+            } else {
+                print("[AddVaultEntryView] Offline mode: Dane zapisane tylko lokalnie.")
+            }
+            
             dismiss()
         } catch {
             print("❌ Failed to encrypt and save entry: \(error)")
         }
     }
     
-    // Zaktualizowany Generator w Stylu Apple
     private func generateAppleStylePassword(length: Int, symbols: Bool, numbers: Bool) -> String {
-        // Celowo usuwamy mylące znaki (O, 0, 1, I, l) by hasła były w 100% czytelne
         var characters = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ"
         if numbers { characters += "23456789" }
         if symbols { characters += "!@#$%^&*_+=" }
         
         var result = ""
         for i in 0..<length {
-            // Wstawiamy myślnik separatora co 6 znaków (np. index 6, 13, 20...)
-            // Dzięki temu dla 20 znaków otrzymamy idealne "xxxxxx-xxxxxx-xxxxxx"
             if i > 0 && (i + 1) % 7 == 0 {
                 result.append("-")
             } else {
@@ -238,13 +232,10 @@ struct AddVaultEntryView: View {
     }
 }
 
-// MARK: - ENTRY FIELD COMPONENT (Ulepszony o zapięcia nawigacyjne)
 struct EntryField: View {
     let label: String
     @Binding var text: String
     var isSecure: Bool = false
-    
-    // Właściwości dla klawiatury
     var submitLabel: SubmitLabel = .next
     var onSubmit: () -> Void = {}
     

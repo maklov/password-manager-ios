@@ -1,67 +1,179 @@
 import SwiftUI
 
+enum RegisterFocusField: Hashable {
+    case fullName, email, masterPassword, confirmPassword
+}
+
+// MARK: - Validation Helpers
+private func isValidEmail(_ email: String) -> Bool {
+    let regex = #"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$"#
+    return email.range(of: regex, options: .regularExpression) != nil
+}
+
+private func isValidFullName(_ name: String) -> Bool {
+    let parts = name.trimmingCharacters(in: .whitespaces).components(separatedBy: " ").filter { !$0.isEmpty }
+    return parts.count >= 2
+}
+
+private func isValidMasterPassword(_ password: String) -> Bool {
+    let wordPattern = #"^[^\-]+-[^\-]+-[^\-]+-[^\-]+$"#
+    let hasWords = password.range(of: wordPattern, options: .regularExpression) != nil
+    return hasWords || password.count >= 12
+}
+
+// MARK: - Shake Modifier
+struct ShakeEffect: GeometryEffect {
+    var amount: CGFloat = 8
+    var shakesPerUnit = 3
+    var animatableData: CGFloat
+
+    func effectValue(size: CGSize) -> ProjectionTransform {
+        let translation = amount * sin(animatableData * .pi * CGFloat(shakesPerUnit))
+        return ProjectionTransform(CGAffineTransform(translationX: translation, y: 0))
+    }
+}
+
+// MARK: - RegisterView
 struct RegisterView: View {
     var onSuccess: () -> Void
     var onBack: () -> Void
-      
+
+    @EnvironmentObject var authManager: AuthManager
+
     @State private var fullNameInput: String = ""
     @State private var emailInput: String = ""
     @State private var masterPasswordInput: String = ""
     @State private var confirmPasswordInput: String = ""
-    
-    // Prosta logika siły hasła (do rozbudowy)
+
+    @FocusState private var focusedField: RegisterFocusField?
+
+    @State private var touchedName = false
+    @State private var touchedEmail = false
+    @State private var touchedPassword = false
+    @State private var touchedConfirm = false
+
+    @State private var isCheckingEmail = false
+    @State private var emailExistsError = false
+
+    @State private var shakeAttempts: CGFloat = 0
+    @State private var showExitConfirm = false
+
+    // MARK: - Validation
+    private var nameError: String? {
+        guard touchedName, !fullNameInput.isEmpty else { return nil }
+        return isValidFullName(fullNameInput) ? nil : "Enter first and last name"
+    }
+
+    private var emailError: String? {
+        guard touchedEmail, !emailInput.isEmpty else { return nil }
+        if !isValidEmail(emailInput) { return "Invalid email format" }
+        if emailExistsError { return "Account with this email already exists" }
+        return nil
+    }
+
+    private var passwordError: String? {
+        guard touchedPassword, !masterPasswordInput.isEmpty else { return nil }
+        return isValidMasterPassword(masterPasswordInput) ? nil : "Min. 12 characters or 4 words separated by hyphens"
+    }
+
+    private var confirmError: String? {
+        guard touchedConfirm, !confirmPasswordInput.isEmpty else { return nil }
+        return confirmPasswordInput == masterPasswordInput ? nil : "Passwords do not match"
+    }
+
+    private var isFormDirty: Bool {
+        !fullNameInput.isEmpty || !emailInput.isEmpty || !masterPasswordInput.isEmpty || !confirmPasswordInput.isEmpty
+    }
+
+    private var canSubmit: Bool {
+        isValidFullName(fullNameInput) &&
+        isValidEmail(emailInput) &&
+        isValidMasterPassword(masterPasswordInput) &&
+        confirmPasswordInput == masterPasswordInput &&
+        !emailExistsError
+    }
+
     private var passwordStrength: Double {
-        let length = Double(masterPasswordInput.count)
-        return min(length / 12.0, 1.0) // Pełny pasek przy 12 znakach
+        min(Double(masterPasswordInput.count) / 12.0, 1.0)
     }
+
+    // MARK: - Actions
     private func handleCreateAccount() {
-        // 1. Zapisanie e-maila
-        UserDefaults.standard.set(emailInput, forKey: "last_logged_email")
-        
-        // 2. Przetworzenie i zapisanie imienia/nazwiska
-        let nameComponents = fullNameInput.trimmingCharacters(in: .whitespaces).components(separatedBy: " ")
-        
-        if let firstName = nameComponents.first {
-            UserDefaults.standard.set(firstName, forKey: "profile_first_name")
+        touchedName = true
+        touchedEmail = true
+        touchedPassword = true
+        touchedConfirm = true
+
+        guard canSubmit else {
+            withAnimation(.default) { shakeAttempts += 1 }
+            return
         }
-        
-        if nameComponents.count > 1 {
-            let lastName = nameComponents.dropFirst().joined(separator: " ")
-            UserDefaults.standard.set(lastName, forKey: "profile_last_name")
-        } else {
-            UserDefaults.standard.set("", forKey: "profile_last_name")
+
+        Task {
+            let result = await APIService.shared.register(email: emailInput, password: masterPasswordInput)
+            DispatchQueue.main.async {
+                switch result {
+                case .success:
+                    UserDefaults.standard.set(emailInput, forKey: "last_logged_email")
+                    let components = fullNameInput
+                        .trimmingCharacters(in: .whitespaces)
+                        .components(separatedBy: " ")
+                        .filter { !$0.isEmpty }
+                    UserDefaults.standard.set(components.first ?? "", forKey: "profile_first_name")
+                    UserDefaults.standard.set(components.dropFirst().joined(separator: " "), forKey: "profile_last_name")
+                    authManager.loginWith(masterPassword: masterPasswordInput, email: emailInput)
+                case .failure(let error):
+                    print("❌ BŁĄD REJESTRACJI: \(error)")
+                    withAnimation(.default) { shakeAttempts += 1 }
+                }
+            }
         }
-        
-        // 3. Po wykonaniu całej "brudnej roboty" wywołujemy Twój callback
-        onSuccess()
     }
-    
+
+    private func checkEmailExists() async {
+        guard isValidEmail(emailInput) else { return }
+        isCheckingEmail = true
+        let host = Bundle.main.object(forInfoDictionaryKey: "ApiHostUrl") as? String ?? ""
+        let encoded = emailInput.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? ""
+        let urlString = "http://\(host)/api/\(encoded)/salt"
+        if let url = URL(string: urlString),
+           let (_, response) = try? await URLSession.shared.data(from: url),
+           let http = response as? HTTPURLResponse {
+            DispatchQueue.main.async {
+                emailExistsError = (http.statusCode == 200)
+                isCheckingEmail = false
+            }
+        } else {
+            DispatchQueue.main.async { isCheckingEmail = false }
+        }
+    }
+
+    // MARK: - Body
     var body: some View {
         ZStack {
             Color(red: 0.07, green: 0.07, blue: 0.08).ignoresSafeArea()
-            
+
             VStack(spacing: 16) {
-                // Pasek nawigacji
                 HStack {
-                    Button(action: onBack) {
+                    Button(action: {
+                        if isFormDirty { showExitConfirm = true } else { onBack() }
+                    }) {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 20, weight: .bold))
                             .foregroundColor(.white)
                     }
                     Spacer()
-                    Text("Vault 66")
-                        .font(.headline)
-                        .foregroundColor(.white)
+                    Text("Vault 66").font(.headline).foregroundColor(.white)
                     Spacer()
                     Color.clear.frame(width: 20, height: 20)
                 }
                 .padding(.horizontal, 24)
                 .padding(.top, 16)
-                
+
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 24) {
-                        
-                        // Nagłówek
+
+                        // Header
                         VStack(alignment: .leading, spacing: 8) {
                             Image(systemName: "shield.fill")
                                 .font(.system(size: 24))
@@ -69,50 +181,99 @@ struct RegisterView: View {
                                 .frame(width: 48, height: 48)
                                 .background(Color(red: 0.16, green: 0.16, blue: 0.17))
                                 .cornerRadius(12)
-                            
+
                             Text("Create your\nsanctuary")
                                 .font(.system(size: 40, weight: .heavy))
                                 .foregroundColor(.white)
                                 .lineLimit(2)
-                            
+
                             Text("Enter your details to establish your encrypted digital perimeter.")
                                 .font(.system(size: 14))
                                 .foregroundColor(Color(red: 0.76, green: 0.78, blue: 0.84))
                         }
                         .padding(.top, 16)
-                        
-                        // Pola
+
                         VStack(spacing: 20) {
-                            RegisterField(title: "FULL NAME", placeholder: "Julian Thorne", text: $fullNameInput)
-                            RegisterField(title: "EMAIL ADDRESS", placeholder: "julian@sentinel.com", text: $emailInput)
-                            
-                            // Master Password z siłą hasła
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("MASTER PASSWORD")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundColor(.gray)
-                                HStack {
-                                    SecureField("••••••••••••", text: $masterPasswordInput)
-                                        .foregroundColor(.white)
-                                    Image(systemName: "eye.slash.fill")
-                                        .foregroundColor(.gray)
+
+                            // Full Name
+                            ValidatedField(
+                                title: "FULL NAME",
+                                placeholder: "Julian Thorne",
+                                text: $fullNameInput,
+                                error: nameError,
+                                keyboardType: .default,
+                                autocapitalization: .words,
+                                submitLabel: .next,
+                                onSubmit: { focusedField = .email },
+                                onEditingChanged: { touchedName = true }
+                            )
+                            .focused($focusedField, equals: .fullName)
+
+                            // Email
+                            ValidatedField(
+                                title: "EMAIL ADDRESS",
+                                placeholder: "julian@sentinel.com",
+                                text: $emailInput,
+                                error: emailError,
+                                keyboardType: .emailAddress,
+                                autocapitalization: .never,
+                                submitLabel: .next,
+                                trailingView: isCheckingEmail ? AnyView(
+                                    ProgressView().scaleEffect(0.7).tint(.gray)
+                                ) : nil,
+                                onSubmit: { focusedField = .masterPassword },
+                                onEditingChanged: {
+                                    touchedEmail = true
+                                    emailExistsError = false
                                 }
-                                .padding()
-                                .background(Color(red: 0.16, green: 0.16, blue: 0.17))
-                                .cornerRadius(12)
-                                
-                                // Wskaźnik siły
+                            )
+                            .focused($focusedField, equals: .email)
+                            .onChange(of: focusedField) { field in
+                                if field != .email && touchedEmail {
+                                    Task { await checkEmailExists() }
+                                }
+                            }
+
+                            // Master Password
+                            VStack(alignment: .leading, spacing: 8) {
                                 HStack {
-                                    Text("Strength: \(passwordStrength > 0.7 ? "Robust" : "Weak")")
+                                    Text("MASTER PASSWORD")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundColor(.gray)
+                                    Spacer()
+                                    Text("\(masterPasswordInput.count)")
+                                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                        .foregroundColor(masterPasswordInput.count >= 12 ? Color(red: 0.51, green: 0.51, blue: 1) : .gray)
+                                        .animation(.easeInOut, value: masterPasswordInput.count)
+                                }
+
+                                SecureField("••••••••••••", text: $masterPasswordInput)
+                                    .foregroundColor(.white)
+                                    .submitLabel(.next)
+                                    .onSubmit { focusedField = .confirmPassword }
+                                    .focused($focusedField, equals: .masterPassword)
+                                    .onChange(of: masterPasswordInput) { _ in touchedPassword = true }
+                                    .padding()
+                                    .background(Color(red: 0.16, green: 0.16, blue: 0.17))
+                                    .cornerRadius(12)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12).stroke(
+                                            passwordError != nil ? Color.red.opacity(0.6) :
+                                            (touchedPassword && isValidMasterPassword(masterPasswordInput) ? Color(red: 0.51, green: 0.51, blue: 1).opacity(0.5) : Color.clear),
+                                            lineWidth: 1
+                                        )
+                                    )
+
+                                HStack {
+                                    Text("Strength: \(passwordStrength > 0.7 ? "Robust" : passwordStrength > 0.4 ? "Fair" : "Weak")")
                                         .font(.caption)
-                                        .foregroundColor(.white)
+                                        .foregroundColor(passwordStrength > 0.7 ? Color(red: 0.51, green: 0.51, blue: 1) : passwordStrength > 0.4 ? .orange : .red)
                                     Spacer()
                                     Text("\(Int(passwordStrength * 100))%")
-                                        .font(.caption)
-                                        .foregroundColor(.white)
+                                        .font(.caption).foregroundColor(.gray)
                                 }
-                                .padding(.top, 4)
-                                
+                                .padding(.top, 2)
+
                                 GeometryReader { geometry in
                                     ZStack(alignment: .leading) {
                                         Capsule()
@@ -120,79 +281,167 @@ struct RegisterView: View {
                                             .foregroundColor(Color.white.opacity(0.1))
                                         Capsule()
                                             .frame(width: geometry.size.width * CGFloat(passwordStrength), height: 4)
-                                            .foregroundColor(passwordStrength > 0.7 ? Color(red: 0.51, green: 0.51, blue: 1) : Color.red)
+                                            .foregroundColor(
+                                                passwordStrength > 0.7 ? Color(red: 0.51, green: 0.51, blue: 1) :
+                                                passwordStrength > 0.4 ? .orange : .red
+                                            )
+                                            .animation(.easeInOut, value: passwordStrength)
                                     }
                                 }
                                 .frame(height: 4)
+
+                                if touchedPassword && passwordError != nil {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "exclamationmark.circle.fill").font(.system(size: 11))
+                                        Text(passwordError!).font(.system(size: 11))
+                                    }
+                                    .foregroundColor(.red)
+                                    .transition(.opacity.combined(with: .move(edge: .top)))
+                                } else if !masterPasswordInput.isEmpty && passwordError == nil {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "info.circle").font(.system(size: 11))
+                                        Text("Tip: use 4 words separated by hyphens, e.g. apple-sky-river-tower")
+                                            .font(.system(size: 11))
+                                    }
+                                    .foregroundColor(.gray)
+                                    .transition(.opacity)
+                                }
                             }
-                            
-                            RegisterField(title: "CONFIRM PASSWORD", placeholder: "••••••••••••", text: $confirmPasswordInput, isSecure: true)
+                            .animation(.easeInOut(duration: 0.2), value: passwordError)
+
+                            // Confirm Password
+                            ValidatedField(
+                                title: "CONFIRM PASSWORD",
+                                placeholder: "••••••••••••",
+                                text: $confirmPasswordInput,
+                                error: confirmError,
+                                isSecure: true,
+                                submitLabel: .done,
+                                onSubmit: { handleCreateAccount() },
+                                onEditingChanged: { touchedConfirm = true }
+                            )
+                            .focused($focusedField, equals: .confirmPassword)
                         }
-                        
-                        // Przycisk Rejestracji
+
+                        // Submit
                         Button(action: handleCreateAccount) {
                             HStack {
                                 Text("Create Account")
                                 Image(systemName: "waveform.path")
                             }
                             .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(Color(red: 0.08, green: 0.08, blue: 0.4))
+                            .foregroundColor(canSubmit ? Color(red: 0.08, green: 0.08, blue: 0.4) : .gray)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
-                            .background(Color(red: 0.51, green: 0.51, blue: 1))
+                            .background(canSubmit ? Color(red: 0.51, green: 0.51, blue: 1) : Color(red: 0.16, green: 0.16, blue: 0.17))
                             .cornerRadius(12)
+                            .animation(.easeInOut(duration: 0.2), value: canSubmit)
                         }
+                        .modifier(ShakeEffect(animatableData: shakeAttempts))
                         .padding(.top, 16)
-                        
-                        // Log in link
+
                         HStack {
                             Spacer()
-                            Text("Already have an account?")
-                                .foregroundColor(.gray)
-                                .font(.system(size: 14))
-                            Button(action: onBack) {
-                                Text("Log in")
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundColor(.white)
+                            Text("Already have an account?").foregroundColor(.gray).font(.system(size: 14))
+                            Button(action: {
+                                if isFormDirty { showExitConfirm = true } else { onBack() }
+                            }) {
+                                Text("Log in").font(.system(size: 14, weight: .bold)).foregroundColor(.white)
                             }
                             Spacer()
                         }
                         .padding(.top, 8)
-                        
+
                         Spacer(minLength: 40)
                     }
                     .padding(.horizontal, 24)
                 }
             }
         }
+        .onAppear { focusedField = .fullName }
+        .onChange(of: authManager.isAuthenticated) { isAuthenticated in
+            if isAuthenticated { onSuccess() }
+        }
+        .confirmationDialog("Discard changes?", isPresented: $showExitConfirm, titleVisibility: .visible) {
+            Button("Discard", role: .destructive) { onBack() }
+            Button("Keep editing", role: .cancel) {}
+        } message: {
+            Text("You have unsaved data. Going back will discard it.")
+        }
     }
 }
 
-// Pomocniczy komponent pola dla powtarzalności
-struct RegisterField: View {
+// MARK: - ValidatedField (shared component)
+struct ValidatedField: View {
     let title: String
     let placeholder: String
     @Binding var text: String
+    var error: String? = nil
     var isSecure: Bool = false
-    
+    var keyboardType: UIKeyboardType = .default
+    var autocapitalization: TextInputAutocapitalization = .never
+    var submitLabel: SubmitLabel = .next
+    var trailingView: AnyView? = nil
+    var onSubmit: () -> Void = {}
+    var onEditingChanged: () -> Void = {}
+
+    @State private var isPasswordVisible: Bool = false
+
+    private var borderColor: Color {
+        if error != nil { return .red.opacity(0.6) }
+        if !text.isEmpty { return Color(red: 0.51, green: 0.51, blue: 1).opacity(0.5) }
+        return Color.clear
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.system(size: 11, weight: .bold))
                 .foregroundColor(.gray)
-            
-            Group {
+
+            HStack {
+                Group {
+                    if isSecure && !isPasswordVisible {
+                        SecureField(placeholder, text: $text)
+                            .submitLabel(submitLabel)
+                            .onSubmit(onSubmit)
+                            .onChange(of: text) { _ in onEditingChanged() }
+                    } else {
+                        TextField(placeholder, text: $text)
+                            .keyboardType(keyboardType)
+                            .textInputAutocapitalization(autocapitalization)
+                            .autocorrectionDisabled()
+                            .submitLabel(submitLabel)
+                            .onSubmit(onSubmit)
+                            .onChange(of: text) { _ in onEditingChanged() }
+                    }
+                }
+                .foregroundColor(.white)
+
+                if let trailing = trailingView { trailing }
+
                 if isSecure {
-                    SecureField(placeholder, text: $text)
-                } else {
-                    TextField(placeholder, text: $text)
-                        .autocapitalization(.none)
+                    Button(action: { isPasswordVisible.toggle() }) {
+                        Image(systemName: isPasswordVisible ? "eye.slash.fill" : "eye.fill")
+                            .foregroundColor(.gray)
+                    }
                 }
             }
-            .foregroundColor(.white)
             .padding()
             .background(Color(red: 0.16, green: 0.16, blue: 0.17))
             .cornerRadius(12)
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(borderColor, lineWidth: 1))
+            .animation(.easeInOut(duration: 0.15), value: error != nil)
+
+            if let errorMsg = error {
+                HStack(spacing: 4) {
+                    Image(systemName: "exclamationmark.circle.fill").font(.system(size: 11))
+                    Text(errorMsg).font(.system(size: 11))
+                }
+                .foregroundColor(.red)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
+        .animation(.easeInOut(duration: 0.2), value: error != nil)
     }
 }

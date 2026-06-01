@@ -10,6 +10,7 @@ import Foundation
 
 struct VaultEntry: Identifiable, Codable {
     let id: String
+    var serverId: Int?      // ← DODAJ TO
     var title: String
     var username: String
     var website: String

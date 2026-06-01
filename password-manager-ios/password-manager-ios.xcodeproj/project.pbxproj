@@ -14,6 +14,7 @@
 		9F8313F92FC77B47009942A7 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F8313F82FC77B47009942A7 /* ProfileView.swift */; };
 		9F9806FA2FB3AFB500C304D2 /* AppRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F9806F92FB3AFB500C304D2 /* AppRootView.swift */; };
 		9F9806FC2FB3B01900C304D2 /* VaultListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F9806FB2FB3B01900C304D2 /* VaultListView.swift */; };
+		9F99E6332FCB925100902551 /* Secrets.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 9F99E6322FCB925100902551 /* Secrets.xcconfig */; };
 		D51B581C2F71FD250060F2D6 /* password_manager_iosApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D51B581B2F71FD250060F2D6 /* password_manager_iosApp.swift */; };
 		D51B58202F71FD2C0060F2D6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D51B581F2F71FD2C0060F2D6 /* Assets.xcassets */; };
 		D51B58232F71FD2C0060F2D6 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D51B58222F71FD2C0060F2D6 /* Preview Assets.xcassets */; };
@@ -57,6 +58,8 @@
 		9F8313F82FC77B47009942A7 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		9F9806F92FB3AFB500C304D2 /* AppRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRootView.swift; sourceTree = "<group>"; };
 		9F9806FB2FB3B01900C304D2 /* VaultListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultListView.swift; sourceTree = "<group>"; };
+		9F99E6322FCB925100902551 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
+		9F99E6342FCB9E0E00902551 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		D51B58182F71FD250060F2D6 /* password-manager-ios.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "password-manager-ios.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		D51B581B2F71FD250060F2D6 /* password_manager_iosApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = password_manager_iosApp.swift; sourceTree = "<group>"; };
 		D51B581F2F71FD2C0060F2D6 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -162,6 +165,8 @@
 		D51B581A2F71FD250060F2D6 /* password-manager-ios */ = {
 			isa = PBXGroup;
 			children = (
+				9F99E6342FCB9E0E00902551 /* Info.plist */,
+				9F99E6322FCB925100902551 /* Secrets.xcconfig */,
 				D5548F882FAA80CA008F9DAC /* Services */,
 				D5548F872FAA80AF008F9DAC /* Models */,
 				D57707502F9E4C6100F3253B /* Views */,
@@ -375,6 +380,7 @@
 			files = (
 				D51B58232F71FD2C0060F2D6 /* Preview Assets.xcassets in Resources */,
 				D51B58202F71FD2C0060F2D6 /* Assets.xcassets in Resources */,
+				9F99E6332FCB925100902551 /* Secrets.xcconfig in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -531,6 +537,7 @@
 		};
 		D51B583F2F71FD2D0060F2D6 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 9F99E6322FCB925100902551 /* Secrets.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -591,6 +598,7 @@
 		};
 		D51B58402F71FD2D0060F2D6 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 9F99E6322FCB925100902551 /* Secrets.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -645,6 +653,7 @@
 		};
 		D51B58422F71FD2D0060F2D6 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 9F99E6322FCB925100902551 /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -654,6 +663,7 @@
 				DEVELOPMENT_TEAM = R3MCXVS9K5;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "password-manager-ios/Info.plist";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Application requires Face ID for user quick identification";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -675,6 +685,7 @@
 		};
 		D51B58432F71FD2D0060F2D6 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 9F99E6322FCB925100902551 /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -684,6 +695,7 @@
 				DEVELOPMENT_TEAM = R3MCXVS9K5;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "password-manager-ios/Info.plist";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Application requires Face ID for user quick identification";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

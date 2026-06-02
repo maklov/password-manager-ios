@@ -17,7 +17,7 @@ class APIService {
         guard let host = Bundle.main.object(forInfoDictionaryKey: "ApiHostUrl") as? String, !host.isEmpty else {
             fatalError("Brak ApiHostUrl w konfiguracji!")
         }
-        return "http://\(host)/api"
+        return "https://\(host)/api"
     }
 
     // MARK: - Salt

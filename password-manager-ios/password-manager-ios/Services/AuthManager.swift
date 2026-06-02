@@ -13,9 +13,9 @@ class AuthManager: ObservableObject {
     @Published var currentAPIToken: String? = nil
     @Published var sessionExpired: Bool = false
 
-    // Referencja do vaultManager — ustawiana z zewnątrz po inicjalizacji
     var vaultManager: LocalVaultManager? = nil
 
+    // ✅ Klucz w Keychainie — nie w UserDefaults
     private let keychainIdentifier = "com.ios-password-manager.masterkey"
 
     init() {
@@ -26,6 +26,24 @@ class AuthManager: ObservableObject {
         return "api_token_\(email.lowercased())"
     }
 
+    // MARK: - Keychain (poprawna implementacja)
+    private func saveKeyToKeychain(key: SymmetricKey) {
+        let keyData = key.withUnsafeBytes { Data($0) }
+        let base64 = keyData.base64EncodedString()
+        KeychainService.save(key: keychainIdentifier, value: base64)
+        print("[AuthManager] 🔑 Master key zapisany w Keychainie.")
+    }
+
+    private func getKeyFromKeychain() -> SymmetricKey? {
+        guard let base64 = KeychainService.load(key: keychainIdentifier),
+              let keyData = Data(base64Encoded: base64) else {
+            print("[AuthManager] ⚠️ Brak master key w Keychainie.")
+            return nil
+        }
+        return SymmetricKey(data: keyData)
+    }
+
+    // MARK: - Biometrics session refresh
     func refreshSessionAfterBiometrics() {
         guard let email = UserDefaults.standard.string(forKey: "last_logged_email") else { return }
 
@@ -53,11 +71,14 @@ class AuthManager: ObservableObject {
         }
     }
 
+    // MARK: - Login
     func loginWith(masterPassword: String, email: String) {
-        let dummySalt = Data("extrasecretshii".utf8)
+        // Lokalny klucz szyfrujący — celowo ze statycznym saltem
+        // (zero-knowledge: klucz niezależny od serwera, serwer nigdy go nie widzi)
+        let localSalt = Data("extrasecretshii".utf8)
 
         do {
-            let key = try CryptoService.deriveKey(masterPassword: masterPassword, salt: dummySalt)
+            let key = try CryptoService.deriveKey(masterPassword: masterPassword, salt: localSalt)
 
             Task {
                 let result = await APIService.shared.login(email: email, password: masterPassword)
@@ -66,14 +87,14 @@ class AuthManager: ObservableObject {
                     switch result {
                     case .success(let token):
                         self.currentMasterKey = key
-                        self.saveKeyToKeychain(key: key)
+                        self.saveKeyToKeychain(key: key)  // ✅ Keychain
                         UserDefaults.standard.set(email, forKey: "last_logged_email")
                         self.currentAPIToken = token
                         KeychainService.save(key: self.getTokenKey(for: email), value: token)
                         self.isAuthenticated = true
                         print("[AuthManager] ☁️ Zalogowano pomyślnie.")
 
-                        // Flush pending queue — wyślij wpisy dodane offline
+                        // Flush pending queue
                         self.vaultManager?.flushPendingQueue(token: token)
 
                     case .failure(let error):
@@ -88,6 +109,7 @@ class AuthManager: ObservableObject {
         }
     }
 
+    // MARK: - Face ID
     func loginWithFaceID() {
         let context = LAContext()
         guard let email = UserDefaults.standard.string(forKey: "last_logged_email") else { return }
@@ -104,7 +126,7 @@ class AuthManager: ObservableObject {
                 DispatchQueue.main.async {
                     if success, let retrievedKey = self.getKeyFromKeychain() {
                         self.currentMasterKey = retrievedKey
-                        self.refreshSessionAfterBiometrics() // flush pending też tu
+                        self.refreshSessionAfterBiometrics()
                         self.isAuthenticated = true
                         print("[AuthManager] 🔓 Zalogowano przez Face ID!")
                     }
@@ -113,6 +135,7 @@ class AuthManager: ObservableObject {
         }
     }
 
+    // MARK: - Logout
     func logout() {
         self.isAuthenticated = false
         self.currentMasterKey = nil
@@ -122,15 +145,5 @@ class AuthManager: ObservableObject {
 
     private func checkBiometricAvailability() {
         self.isBiometricAvailable = LAContext().canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil)
-    }
-
-    private func saveKeyToKeychain(key: SymmetricKey) {
-        let keyData = key.withUnsafeBytes { Data($0) }
-        UserDefaults.standard.set(keyData, forKey: keychainIdentifier)
-    }
-
-    private func getKeyFromKeychain() -> SymmetricKey? {
-        guard let keyData = UserDefaults.standard.data(forKey: keychainIdentifier) else { return nil }
-        return SymmetricKey(data: keyData)
     }
 }

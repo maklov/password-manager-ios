@@ -26,6 +26,9 @@ struct password_manager_iosApp: App {
                 .environmentObject(authManager)
                 .environmentObject(navState)
                 .environmentObject(autoLockManager)
+                .onAppear {
+                    authManager.vaultManager = vaultManager
+                }
         }
     }
 }

@@ -10,20 +10,35 @@ final class LocalVaultManager: ObservableObject {
         return "vault_cache_\(email)"
     }
 
+    private var pendingKey: String {
+        let email = UserDefaults.standard.string(forKey: "last_logged_email") ?? "default_user"
+        return "vault_pending_\(email)"
+    }
+
     private var sharedDefaults: UserDefaults? {
         return UserDefaults(suiteName: "group.maklov.password-manager-ios")
     }
 
     init() { loadFromOfflineCache() }
 
-    // MARK: - Sync
+    // MARK: - Sync z serwerem
     func loadAndSyncVault(token: String) {
         Task {
             let result = await APIService.shared.fetchVault(token: token)
             DispatchQueue.main.async {
                 switch result {
                 case .success(let serverEntries):
-                    self.entries = serverEntries
+                    // Scal wpisy serwera z pending queue — pending ma priorytet
+                    let pending = self.loadPendingQueue()
+                    if pending.isEmpty {
+                        self.entries = serverEntries
+                    } else {
+                        // Zachowaj pending wpisy których nie ma na serwerze
+                        let serverIds = Set(serverEntries.compactMap { $0.serverId })
+                        let pendingOnly = pending.filter { $0.serverId == nil || !serverIds.contains($0.serverId!) }
+                        self.entries = serverEntries + pendingOnly
+                        print("[VaultManager] 🔀 Scalono \(serverEntries.count) z serwera + \(pendingOnly.count) pending")
+                    }
                     self.saveToOfflineCache()
                 case .failure(let error):
                     print("[VaultManager] ⚠️ Błąd serwera: \(error). Używam cache.")
@@ -38,12 +53,22 @@ final class LocalVaultManager: ObservableObject {
             let result = await APIService.shared.syncVaultToServer(entry: entry, token: token)
             switch result {
             case .success(let serverId):
+                // Sukces — przypisz serverId i usuń z pending queue
                 if let index = self.entries.firstIndex(where: { $0.id == entry.id }) {
                     self.entries[index].serverId = serverId
                     self.saveToOfflineCache()
                 }
+                self.removeFromPendingQueue(entryId: entry.id)
+                print("[VaultManager] ☁️ Wysłano na serwer: \(entry.title) (serverId: \(serverId))")
+
             case .failure(let error):
-                print("[VaultManager] ⚠️ Błąd wysyłki: \(error)")
+                if case .offline = error {
+                    // Brak sieci — zapisz do pending queue
+                    self.saveToPendingQueue(entry)
+                    print("[VaultManager] 📦 Brak sieci — wpis w pending queue: \(entry.title)")
+                } else {
+                    print("[VaultManager] ⚠️ Błąd wysyłki: \(error)")
+                }
             }
         }
     }
@@ -56,6 +81,70 @@ final class LocalVaultManager: ObservableObject {
                 print("[VaultManager] ✏️ Zaktualizowano: \(entry.title)")
             case .failure(let error):
                 print("[VaultManager] ⚠️ Błąd aktualizacji: \(error)")
+            }
+        }
+    }
+
+    // MARK: - Pending Queue
+    private func saveToPendingQueue(_ entry: VaultEntry) {
+        var pending = loadPendingQueue()
+        // Nie dodawaj duplikatów
+        if !pending.contains(where: { $0.id == entry.id }) {
+            pending.append(entry)
+        }
+        if let data = try? JSONEncoder().encode(pending) {
+            UserDefaults.standard.set(data, forKey: pendingKey)
+            print("[VaultManager] 📦 Pending queue: \(pending.count) wpisów")
+        }
+    }
+
+    private func removeFromPendingQueue(entryId: String) {
+        var pending = loadPendingQueue()
+        pending.removeAll { $0.id == entryId }
+        if let data = try? JSONEncoder().encode(pending) {
+            UserDefaults.standard.set(data, forKey: pendingKey)
+        }
+    }
+
+    func loadPendingQueue() -> [VaultEntry] {
+        guard let data = UserDefaults.standard.data(forKey: pendingKey),
+              let entries = try? JSONDecoder().decode([VaultEntry].self, from: data) else { return [] }
+        return entries
+    }
+
+    func clearPendingQueue() {
+        UserDefaults.standard.removeObject(forKey: pendingKey)
+    }
+
+    // Wywoływane gdy sieć wraca — wysyła wszystkie pending wpisy
+    func flushPendingQueue(token: String) {
+        let pending = loadPendingQueue()
+        guard !pending.isEmpty else { return }
+
+        print("[VaultManager] 📤 Flush pending queue: \(pending.count) wpisów...")
+
+        Task {
+            for entry in pending {
+                let result = await APIService.shared.syncVaultToServer(entry: entry, token: token)
+                switch result {
+                case .success(let serverId):
+                    if let index = self.entries.firstIndex(where: { $0.id == entry.id }) {
+                        self.entries[index].serverId = serverId
+                    }
+                    self.removeFromPendingQueue(entryId: entry.id)
+                    print("[VaultManager] ✅ Pending wysłany: \(entry.title) → serverId: \(serverId)")
+                case .failure(let error):
+                    print("[VaultManager] ⚠️ Pending nadal offline: \(entry.title) — \(error)")
+                    // Zostaje w kolejce — spróbujemy następnym razem
+                }
+            }
+            self.saveToOfflineCache()
+
+            let remaining = self.loadPendingQueue().count
+            if remaining == 0 {
+                print("[VaultManager] ✅ Pending queue wyczyszczona — wszystko na serwerze")
+            } else {
+                print("[VaultManager] ⚠️ Pozostało \(remaining) wpisów w pending queue")
             }
         }
     }
@@ -77,7 +166,6 @@ final class LocalVaultManager: ObservableObject {
         do {
             let encryptedPassword = try CryptoService.encrypt(plaintext: rawPassword, using: key)
 
-            // Szyfruj notes jeśli nie puste
             var notesCiphertext: String? = nil
             var notesNonce: String? = nil
             if !notes.isEmpty {
@@ -111,6 +199,10 @@ final class LocalVaultManager: ObservableObject {
 
             if !token.isEmpty {
                 pushChangesToServer(entry: newEntry, token: token)
+            } else {
+                // Brak tokena — od razu do pending queue
+                saveToPendingQueue(newEntry)
+                print("[VaultManager] 📦 Brak tokena — wpis w pending queue: \(title)")
             }
         } catch {
             print("[LocalVaultManager] ❌ Błąd szyfrowania: \(error)")
@@ -135,6 +227,11 @@ final class LocalVaultManager: ObservableObject {
         let entriesToDelete = offsets.map { entries[$0] }
         self.entries.remove(atOffsets: offsets)
         self.saveToOfflineCache()
+
+        // Usuń też z pending queue jeśli tam były
+        for entry in entriesToDelete {
+            removeFromPendingQueue(entryId: entry.id)
+        }
 
         Task {
             for entry in entriesToDelete {

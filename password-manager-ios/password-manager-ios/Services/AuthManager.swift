@@ -7,23 +7,25 @@ import Security
 class AuthManager: ObservableObject {
     @Published var isAuthenticated: Bool = false
     @Published var isBiometricAvailable: Bool = false
-    
+
     private(set) var currentMasterKey: SymmetricKey?
     @Published var loginError: String? = nil
     @Published var currentAPIToken: String? = nil
     @Published var sessionExpired: Bool = false
 
-    
+    // Referencja do vaultManager — ustawiana z zewnątrz po inicjalizacji
+    var vaultManager: LocalVaultManager? = nil
+
     private let keychainIdentifier = "com.ios-password-manager.masterkey"
 
     init() {
         checkBiometricAvailability()
     }
-    
+
     private func getTokenKey(for email: String) -> String {
         return "api_token_\(email.lowercased())"
     }
-    
+
     func refreshSessionAfterBiometrics() {
         guard let email = UserDefaults.standard.string(forKey: "last_logged_email") else { return }
 
@@ -34,22 +36,23 @@ class AuthManager: ObservableObject {
 
         self.currentAPIToken = savedToken
 
-        // Weryfikuj token przez API w tle
         Task {
             let result = await APIService.shared.fetchVault(token: savedToken)
             DispatchQueue.main.async {
                 if case .failure(let error) = result, case .unauthorized = error {
-                    // Token wygasł — wyloguj i pokaż komunikat
                     print("[AuthManager] 🔒 Token wygasł. Wymagane ponowne logowanie.")
                     self.isAuthenticated = false
                     self.currentMasterKey = nil
                     self.currentAPIToken = nil
                     self.sessionExpired = true
+                } else {
+                    // Token OK — flush pending queue
+                    self.vaultManager?.flushPendingQueue(token: savedToken)
                 }
             }
         }
     }
-        
+
     func loginWith(masterPassword: String, email: String) {
         let dummySalt = Data("extrasecretshii".utf8)
 
@@ -62,7 +65,6 @@ class AuthManager: ObservableObject {
                 DispatchQueue.main.async {
                     switch result {
                     case .success(let token):
-                        // Dopiero tu wpuszczamy użytkownika
                         self.currentMasterKey = key
                         self.saveKeyToKeychain(key: key)
                         UserDefaults.standard.set(email, forKey: "last_logged_email")
@@ -71,8 +73,10 @@ class AuthManager: ObservableObject {
                         self.isAuthenticated = true
                         print("[AuthManager] ☁️ Zalogowano pomyślnie.")
 
+                        // Flush pending queue — wyślij wpisy dodane offline
+                        self.vaultManager?.flushPendingQueue(token: token)
+
                     case .failure(let error):
-                        // Klucz NIE jest zapisywany, użytkownik NIE wchodzi
                         self.loginError = "Incorrect email or password"
                         print("[AuthManager] ❌ Błąd logowania: \(error)")
                     }
@@ -83,27 +87,24 @@ class AuthManager: ObservableObject {
             print("[AuthManager] ❌ Błąd klucza: \(error)")
         }
     }
-    
+
     func loginWithFaceID() {
         let context = LAContext()
         guard let email = UserDefaults.standard.string(forKey: "last_logged_email") else { return }
-            
-            // 2. Sprawdź, czy w ogóle mamy token dla tego użytkownika
-            let hasToken = KeychainService.load(key: getTokenKey(for: email)) != nil
-            guard hasToken else {
-                print("[AuthManager] ❌ Face ID zablokowane: brak zapisanego tokena sesji.")
-                return
-            }
+
+        let hasToken = KeychainService.load(key: getTokenKey(for: email)) != nil
+        guard hasToken else {
+            print("[AuthManager] ❌ Face ID zablokowane: brak zapisanego tokena sesji.")
+            return
+        }
         guard UserDefaults.standard.bool(forKey: "biometric_unlock_enabled") else { return }
-        
+
         if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil) {
             context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: "Odblokuj sejf") { success, _ in
                 DispatchQueue.main.async {
                     if success, let retrievedKey = self.getKeyFromKeychain() {
                         self.currentMasterKey = retrievedKey
-                        // 1. Najpierw odzyskujemy sesję
-                        self.refreshSessionAfterBiometrics()
-                        // 2. Potem wpuszczamy użytkownika
+                        self.refreshSessionAfterBiometrics() // flush pending też tu
                         self.isAuthenticated = true
                         print("[AuthManager] 🔓 Zalogowano przez Face ID!")
                     }
@@ -111,23 +112,23 @@ class AuthManager: ObservableObject {
             }
         }
     }
-    
+
     func logout() {
         self.isAuthenticated = false
         self.currentMasterKey = nil
         self.currentAPIToken = nil
         print("[AuthManager] 🔒 Wylogowano!")
     }
-    
+
     private func checkBiometricAvailability() {
         self.isBiometricAvailable = LAContext().canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil)
     }
-    
+
     private func saveKeyToKeychain(key: SymmetricKey) {
         let keyData = key.withUnsafeBytes { Data($0) }
         UserDefaults.standard.set(keyData, forKey: keychainIdentifier)
     }
-    
+
     private func getKeyFromKeychain() -> SymmetricKey? {
         guard let keyData = UserDefaults.standard.data(forKey: keychainIdentifier) else { return nil }
         return SymmetricKey(data: keyData)

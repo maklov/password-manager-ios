@@ -9,7 +9,8 @@ class KeychainService {
         let query = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrAccount: key,
-            kSecValueData: data
+            kSecValueData: data,
+            kSecAttrAccessible: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         ] as [String: Any]
         
         SecItemDelete(query as CFDictionary)

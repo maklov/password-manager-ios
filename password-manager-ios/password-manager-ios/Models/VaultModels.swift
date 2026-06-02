@@ -1,6 +1,6 @@
 import Foundation
 
-struct VaultEntry: Codable, Identifiable {
+struct VaultEntry: Codable, Identifiable, Hashable {
     var id: String
     var serverId: Int?
     var title: String

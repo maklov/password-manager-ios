@@ -20,6 +20,25 @@ struct SecuritySettingsView: View {
 
     var body: some View {
         NavigationStack {
+            NavigationLink(
+                destination: Group {
+                    if let entry = entryToEdit {
+                        PasswordDetailView(entry: entry, onDelete: {
+                            if let index = vaultManager.entries.firstIndex(where: { $0.id == entry.id }) {
+                                vaultManager.removeEntry(at: IndexSet(integer: index), token: authManager.currentAPIToken ?? "")
+                            }
+                            entryToEdit = nil
+                            runAnalysis()
+                        })
+                        .environmentObject(vaultManager)
+                        .environmentObject(authManager)
+                    }
+                },
+                isActive: Binding(
+                    get: { entryToEdit != nil },
+                    set: { if !$0 { entryToEdit = nil; runAnalysis() } }
+                )
+            ) { EmptyView() }
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
 
@@ -242,27 +261,10 @@ struct SecuritySettingsView: View {
                 .padding(24)
             }
             .background(Color(red: 0.07, green: 0.07, blue: 0.08))
-            // Nawigacja do PasswordDetailView po kliknięciu wpisu w dashboardzie
-            .navigationDestination(item: $entryToEdit) { entry in
-                PasswordDetailView(entry: entry, onDelete: {
-                    if let index = vaultManager.entries.firstIndex(where: { $0.id == entry.id }) {
-                        vaultManager.removeEntry(at: IndexSet(integer: index), token: authManager.currentAPIToken ?? "")
-                    }
-                    entryToEdit = nil
-                    // Odśwież analizę po powrocie
-                    runAnalysis()
-                })
-                .environmentObject(vaultManager)
-                .environmentObject(authManager)
-            }
         }
         .onAppear {
             selectedTimeout = autoLockManager.selectedTimeout
             runAnalysis()
-        }
-        // Odśwież analizę po powrocie z edycji
-        .onChange(of: entryToEdit) { entry in
-            if entry == nil { runAnalysis() }
         }
     }
 

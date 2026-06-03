@@ -27,6 +27,7 @@ struct password_manager_iosApp: App {
                 .environmentObject(navState)
                 .environmentObject(autoLockManager)
                 .onAppear {
+                    UserDefaults.standard.removeObject(forKey: "onboarding_completed")
                     authManager.vaultManager = vaultManager
                 }
         }

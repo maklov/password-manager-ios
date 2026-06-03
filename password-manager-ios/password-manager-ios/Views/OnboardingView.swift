@@ -205,7 +205,7 @@ struct OnboardingPage3: View {
                 }
 
                 VStack(spacing: 10) {
-                    TipCard(icon: "pencil.and.paper", color: .green,
+                    TipCard(icon: "square.and.pencil", color: .green,
                         title: "Write it down physically",
                         description: "Write your master password on paper and store it in a safe or lockbox. Never store it digitally in plaintext.")
                     TipCard(icon: "person.2.fill", color: .blue,

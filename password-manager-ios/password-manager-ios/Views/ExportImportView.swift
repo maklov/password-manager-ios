@@ -283,11 +283,11 @@ struct ExportImportView: View {
                 DispatchQueue.main.async {
                     isExporting = false
                     exportedFileURL = tempURL
-                    showExportSheet = false
                     exportPassword = ""
                     exportPasswordConfirm = ""
-                    // Krótkie opóźnienie żeby sheet zdążył się zamknąć
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    showExportSheet = false
+                    // Dłuższe opóźnienie — czekamy aż sheet z hasłem w pełni zniknie
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                         showShareSheet = true
                     }
                 }

@@ -5,6 +5,7 @@ class AppNavigationState: ObservableObject {
 }
 
 enum AppRoute {
+    case onboarding
     case welcome
     case login
     case register
@@ -20,31 +21,38 @@ struct AppRootView: View {
 
     var body: some View {
         ZStack {
-            // Routing bez NavigationStack — każdy widok ma własny jeśli potrzebuje
             Group {
                 switch navState.currentRoute {
+                case .onboarding:
+                    OnboardingView(onComplete: {
+                        navState.currentRoute = .welcome
+                    })
+
                 case .welcome:
                     WelcomeView(
                         onLogin: { navState.currentRoute = .login },
                         onRegister: { navState.currentRoute = .register }
                     )
+
                 case .login:
                     LoginView(
                         onSuccess: { navState.currentRoute = .mainTab },
                         onBack: { navState.currentRoute = .welcome }
                     )
+
                 case .register:
                     RegisterView(
                         onSuccess: { navState.currentRoute = .mainTab },
                         onBack: { navState.currentRoute = .welcome }
                     )
+
                 case .mainTab:
                     MainTabView()
                 }
             }
             .animation(.easeInOut, value: navState.currentRoute)
 
-            // Ekran blokady — overlay na całej aplikacji
+            // Ekran blokady
             if autoLockManager.isLocked && navState.currentRoute == .mainTab {
                 LockScreenView()
                     .environmentObject(authManager)
@@ -55,14 +63,18 @@ struct AppRootView: View {
         }
         .preferredColorScheme(.dark)
         .animation(.easeInOut(duration: 0.3), value: autoLockManager.isLocked)
+        .onAppear {
+            // Pokaż onboarding tylko przy pierwszym uruchomieniu
+            let completed = UserDefaults.standard.bool(forKey: "onboarding_completed")
+            if !completed {
+                navState.currentRoute = .onboarding
+            }
+        }
         .onChange(of: scenePhase) { phase in
             switch phase {
-            case .background:
-                autoLockManager.onAppBackground()
-            case .active:
-                autoLockManager.onAppForeground()
-            default:
-                break
+            case .background: autoLockManager.onAppBackground()
+            case .active:     autoLockManager.onAppForeground()
+            default: break
             }
         }
         .onChange(of: authManager.isAuthenticated) { isAuth in

@@ -290,7 +290,9 @@ struct VaultListView: View {
                 .environmentObject(authManager)
         }
         .onAppear {
-            vaultManager.loadFromOfflineCache()
+            if let token = authManager.currentAPIToken {
+                    vaultManager.loadAndSyncVault(token: token)
+            }
         }
     }
 }

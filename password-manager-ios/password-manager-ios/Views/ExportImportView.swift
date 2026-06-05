@@ -282,13 +282,21 @@ struct ExportImportView: View {
 
                 DispatchQueue.main.async {
                     isExporting = false
-                    exportedFileURL = tempURL
                     exportPassword = ""
                     exportPasswordConfirm = ""
                     showExportSheet = false
-                    // Dłuższe opóźnienie — czekamy aż sheet z hasłem w pełni zniknie
+
+                    // Prezentuj share sheet przez UIKit bezpośrednio — bez drugiego .sheet
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                        showShareSheet = true
+                        let av = UIActivityViewController(activityItems: [tempURL], applicationActivities: nil)
+                        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                           let root = windowScene.windows.first?.rootViewController {
+                            var presented = root
+                            while let next = presented.presentedViewController {
+                                presented = next
+                            }
+                            presented.present(av, animated: true)
+                        }
                     }
                 }
             } catch {

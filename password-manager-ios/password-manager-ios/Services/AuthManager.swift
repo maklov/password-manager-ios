@@ -65,6 +65,7 @@ class AuthManager: ObservableObject {
                     self.sessionExpired = true
                 } else {
                     // Token OK — flush pending queue
+                    self.vaultManager?.loadAndSyncVault(token: savedToken)
                     self.vaultManager?.flushPendingQueue(token: savedToken)
                 }
             }
@@ -95,6 +96,7 @@ class AuthManager: ObservableObject {
                         print("[AuthManager] ☁️ Zalogowano pomyślnie.")
 
                         // Flush pending queue
+                        self.vaultManager?.loadAndSyncVault(token: token)
                         self.vaultManager?.flushPendingQueue(token: token)
 
                     case .failure(let error):
